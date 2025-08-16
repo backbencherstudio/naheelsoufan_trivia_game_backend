@@ -1,0 +1,160 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { CreateQuestionTypeDto } from './dto/create-question-type.dto';
+import { UpdateQuestionTypeDto } from './dto/update-question-type.dto';
+
+@Injectable()
+export class QuestionTypeService {
+  constructor(private readonly prisma: PrismaService) { }
+
+  // Create a new question type
+  async create(createQuestionTypeDto: CreateQuestionTypeDto) {
+    try {
+      const questionType = await this.prisma.questionType.create({
+        data: createQuestionTypeDto,
+        select: {
+          id: true,
+          name: true,
+          language_id: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Question type created successfully',
+        data: questionType,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error creating question type: ${error.message}`,
+      };
+    }
+  }
+
+  // Get all question types
+  async findAll(searchQuery: string | null) {
+    try {
+      const whereClause = {};
+      if (searchQuery) {
+        whereClause['name'] = { contains: searchQuery, mode: 'insensitive' };
+      }
+
+      const questionTypes = await this.prisma.questionType.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          created_at: true,
+          updated_at: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        message: questionTypes.length
+          ? 'Question types retrieved successfully'
+          : 'No question types found',
+        data: questionTypes,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error fetching question types: ${error.message}`,
+      };
+    }
+  }
+
+  // Get a single question type by ID
+  async findOne(id: string) {
+    try {
+      const questionType = await this.prisma.questionType.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          created_at: true,
+          updated_at: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        message: questionType ? 'Question type retrieved successfully' : 'Question type not found',
+        data: questionType,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error fetching question type: ${error.message}`,
+      };
+    }
+  }
+
+  // Update an existing question type
+  async update(id: string, updateQuestionTypeDto: UpdateQuestionTypeDto) {
+    try {
+      const updatedQuestionType = await this.prisma.questionType.update({
+        where: { id },
+        data: updateQuestionTypeDto,
+        select: {
+          id: true,
+          name: true,
+          language_id: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Question type updated successfully',
+        data: updatedQuestionType,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error updating question type: ${error.message}`,
+      };
+    }
+  }
+
+  // Delete a question type by ID
+  async remove(id: string) {
+    try {
+      const deletedQuestionType = await this.prisma.questionType.delete({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          language_id: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Question type deleted successfully',
+        data: deletedQuestionType,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error deleting question type: ${error.message}`,
+      };
+    }
+  }
+}
