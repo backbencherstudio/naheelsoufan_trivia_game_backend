@@ -78,6 +78,7 @@ export default () => ({
     attachment: '/attachment/',
     //main
     language: '/language/',
+    category: '/category/',
   },
 
   defaultUser: {
