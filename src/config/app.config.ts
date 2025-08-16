@@ -79,6 +79,8 @@ export default () => ({
     //main
     language: '/language/',
     category: '/category/',
+    question: '/question/',
+    answer: '/answer/',
   },
 
   defaultUser: {

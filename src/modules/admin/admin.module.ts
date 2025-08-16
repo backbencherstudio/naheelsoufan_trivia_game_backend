@@ -8,6 +8,8 @@ import { NotificationModule } from './notification/notification.module';
 import { LanguageModule } from './language/language.module';
 import { CategoryModule } from './category/category.module';
 import { DifficultyModule } from './difficulty/difficulty.module';
+import { QuestionTypeModule } from './question-type/question-type.module';
+import { QuestionModule } from './question/question.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { DifficultyModule } from './difficulty/difficulty.module';
     LanguageModule,
     CategoryModule,
     DifficultyModule,
+    QuestionTypeModule,
+    QuestionModule,
   ],
 })
 export class AdminModule {}
