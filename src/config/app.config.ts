@@ -76,6 +76,8 @@ export default () => ({
     websiteInfo: '/website-info/',
     // chat
     attachment: '/attachment/',
+    //main
+    language: '/language/',
   },
 
   defaultUser: {
