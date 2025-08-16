@@ -5,6 +5,11 @@ import { WebsiteInfoModule } from './website-info/website-info.module';
 import { PaymentTransactionModule } from './payment-transaction/payment-transaction.module';
 import { UserModule } from './user/user.module';
 import { NotificationModule } from './notification/notification.module';
+import { LanguageModule } from './language/language.module';
+import { CategoryModule } from './category/category.module';
+import { DifficultyModule } from './difficulty/difficulty.module';
+import { QuestionTypeModule } from './question-type/question-type.module';
+import { QuestionModule } from './question/question.module';
 
 @Module({
   imports: [
@@ -14,6 +19,11 @@ import { NotificationModule } from './notification/notification.module';
     PaymentTransactionModule,
     UserModule,
     NotificationModule,
+    LanguageModule,
+    CategoryModule,
+    DifficultyModule,
+    QuestionTypeModule,
+    QuestionModule,
   ],
 })
 export class AdminModule {}
