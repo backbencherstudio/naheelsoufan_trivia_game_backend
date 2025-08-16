@@ -7,6 +7,7 @@ import { UserModule } from './user/user.module';
 import { NotificationModule } from './notification/notification.module';
 import { LanguageModule } from './language/language.module';
 import { CategoryModule } from './category/category.module';
+import { DifficultyModule } from './difficulty/difficulty.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CategoryModule } from './category/category.module';
     NotificationModule,
     LanguageModule,
     CategoryModule,
+    DifficultyModule,
   ],
 })
 export class AdminModule {}
