@@ -11,7 +11,7 @@ import { Role } from '../../../common/guard/role/role.enum';
 @ApiTags('Questions')
 @Controller('questions')
 export class QuestionController {
-  constructor(private readonly questionService: QuestionService) {}
+  constructor(private readonly questionService: QuestionService) { }
 
   // Create a new question with answers and handle files
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,9 +46,29 @@ export class QuestionController {
   // Get all questions with their answers and files
   @ApiOperation({ summary: 'Get all questions with answers and files' })
   @Get()
-  async findAll(@Query() query: { q?: string }) {
+  async findAll(@Query() query: {
+    q?: string,
+    category_id?: string,
+    language_id?: string,
+    difficulty_id?: string,
+    question_type_id?: string,
+    page?: number,
+    limit?: number,
+    sort?: string,
+    order?: string
+  }) {
     try {
-      const result = await this.questionService.findAll(query.q);
+      const page = query.page ? Number(query.page) : 1;
+      const limit = query.limit ? Number(query.limit) : 10;
+      const sort = query.sort ? query.sort : 'created_at';
+      const order = query.order ? query.order : 'desc';
+      const filter = {
+        category_id: query.category_id,
+        language_id: query.language_id,
+        difficulty_id: query.difficulty_id,
+        question_type_id: query.question_type_id,
+      };
+      const result = await this.questionService.findAll(query.q, page, limit, sort, order, filter);
       return result;
     } catch (error) {
       return {

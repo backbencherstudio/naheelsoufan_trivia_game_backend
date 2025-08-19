@@ -69,20 +69,39 @@ export class QuestionService {
     }
   }
 
-  async findAll(q: string) {
+  async findAll(q: string, page: number, limit: number, sort: string, order: string, filter: any) {
     try {
-      // Construct the search filter
-      const searchFilter = {}
+      const skip = (page - 1) * limit;
+  
+      // Construct the search filter based on query
+      const searchFilter = {};
+  
       if (q) {
         searchFilter['OR'] = [
           { text: { contains: q, mode: 'insensitive' } },
           { answers: { some: { text: { contains: q, mode: 'insensitive' } } } },
         ];
       }
-
-      // Query questions with answers, applying the search filter
+  
+      // Apply additional filters like category, language, difficulty, question type
+      if (filter) {
+        if (filter.category_id) searchFilter['category_id'] = filter.category_id;
+        if (filter.language_id) searchFilter['language_id'] = filter.language_id;
+        if (filter.difficulty_id) searchFilter['difficulty_id'] = filter.difficulty_id;
+        if (filter.question_type_id) searchFilter['question_type_id'] = filter.question_type_id;
+      }
+  
+      // Count total records for pagination
+      const total = await this.prisma.question.count({ where: searchFilter });
+  
+      // Query the questions with pagination, sorting, and filtering
       const questions = await this.prisma.question.findMany({
         where: searchFilter,
+        skip: skip,
+        take: limit,
+        orderBy: {
+          [sort]: order,  // Dynamically sort by the field and order provided
+        },
         select: {
           id: true,
           text: true,
@@ -93,48 +112,19 @@ export class QuestionService {
           points: true,
           created_at: true,
           updated_at: true,
-          category: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          language: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          difficulty: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          question_type: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          answers: {
-            select: {
-              id: true,
-              text: true,
-              is_correct: true,
-              file_url: true,
-            },
-          },
+          category: { select: { id: true, name: true } },
+          language: { select: { id: true, name: true } },
+          difficulty: { select: { id: true, name: true } },
+          question_type: { select: { id: true, name: true } },
+          answers: { select: { id: true, text: true, is_correct: true, file_url: true } },
         },
       });
-
+  
       // Add file URLs for questions and answers
       for (const question of questions) {
         if (question.file_url) {
           question['file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
         }
-
-        // Loop through answers to add file URLs
         if (question.answers && question.answers.length > 0) {
           for (const answer of question.answers) {
             if (answer.file_url) {
@@ -143,11 +133,24 @@ export class QuestionService {
           }
         }
       }
-
+  
+      // Pagination metadata calculation
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+  
       return {
         success: true,
         message: questions.length ? 'Questions retrieved successfully' : 'No questions found',
         data: questions,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
       };
     } catch (error) {
       return {
@@ -156,7 +159,6 @@ export class QuestionService {
       };
     }
   }
-
 
   // Get a single question by ID with associated answers and files
   async findOne(id: string) {

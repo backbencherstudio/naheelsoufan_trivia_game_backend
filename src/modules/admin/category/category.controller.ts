@@ -50,10 +50,12 @@ export class CategoryController {
 
   @ApiOperation({ summary: 'Read all categories' })
   @Get()
-  async findAll(@Query() query: { q?: string }) {
+  async findAll(@Query() query: { q?: string, page?: number, limit?: number }) {
     try {
       const searchQuery = query.q;  // Optional search query
-      const categories = await this.categoryService.findAll(searchQuery);  // Fetch all categories
+      const page = query.page ? Number(query.page) : 1;
+      const limit = query.limit ? Number(query.limit) : 10;
+      const categories = await this.categoryService.findAll(searchQuery, page, limit);  // Fetch all categories
       return categories;
     } catch (error) {
       return {

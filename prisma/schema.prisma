@@ -93,6 +93,11 @@ model User {
   payment_transactions PaymentTransaction[]
   subscriptions        Subscription[]
 
+  // Game-related relations
+  created_games           Game[]         @relation("game_creator") // Games created by this user
+  game_players            GamePlayer[] // Games this user is playing in
+  selected_game_questions GameQuestion[] // Questions selected by this user in Grid Style games
+
   @@map("users")
 }
 
@@ -481,6 +486,7 @@ model Language {
   question_types QuestionType[]
   difficulties   Difficulty[]
   questions      Question[]
+  games          Game[] // Games that use this language
 
   @@map("languages") // Table name in database
 }
@@ -495,6 +501,7 @@ model Category {
 
   language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
   questions Question[] // Related questions
+  games     Game[] // Games that use this category (Quick Game mode)
 
   @@map("categories") // Table name in database
 }
@@ -540,11 +547,13 @@ model Question {
   created_at       DateTime @default(now()) // Automatically sets the creation date
   updated_at       DateTime @updatedAt // Automatically updates the last modified date
 
-  category      Category     @relation(fields: [category_id], references: [id], onDelete: Cascade) // Relation with Category model
-  language      Language     @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  difficulty    Difficulty   @relation(fields: [difficulty_id], references: [id], onDelete: Cascade) // Relation with Difficulty model
-  question_type QuestionType @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
-  answers       Answer[] // Related answers to the question
+  category       Category       @relation(fields: [category_id], references: [id], onDelete: Cascade) // Relation with Category model
+  language       Language       @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  difficulty     Difficulty     @relation(fields: [difficulty_id], references: [id], onDelete: Cascade) // Relation with Difficulty model
+  question_type  QuestionType   @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
+  answers        Answer[] // Related answers to the question
+  game_questions GameQuestion[] // Game instances where this question was used
+  game_answers   GameAnswer[] // Game answers for this question
 
   @@map("questions") // Table name in database
 }
@@ -556,7 +565,151 @@ model Answer {
   file_url    String? // The answer file url
   is_correct  Boolean @default(false) // Whether the answer is correct or not
 
-  question Question @relation(fields: [question_id], references: [id], onDelete: Cascade) // Relation with Question model
+  question     Question     @relation(fields: [question_id], references: [id], onDelete: Cascade) // Relation with Question model
+  game_answers GameAnswer[] // Related game answers
 
   @@map("answers") // Table name in database
 }
+
+// ---------Start Game schema---------
+
+enum GameMode {
+  QUICK_GAME
+  GRID_STYLE
+}
+
+enum GameStatus {
+  WAITING // Waiting for players to join
+  IN_PROGRESS // Game is currently being played
+  COMPLETED // Game has finished
+  CANCELLED // Game was cancelled
+}
+
+model Game {
+  id         String    @id @default(cuid()) // Unique identifier for the game
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  mode   GameMode   @default(QUICK_GAME) // Game mode: Quick Game or Grid Style
+  status GameStatus @default(WAITING) // Current status of the game
+
+  // Game settings
+  max_players       Int  @default(8) // Maximum number of players (up to 4)
+  question_count    Int? // Number of questions for Quick Game (10-15), null for Grid Style
+  time_per_question Int? // Time limit per question in seconds
+
+  // For Quick Game - selected category
+  category_id String? // Foreign key to Category model (for Quick Game mode)
+  category    Category? @relation(fields: [category_id], references: [id])
+
+  // For Grid Style - all categories are available, no specific category selected
+  language_id String // Foreign key to Language model (game language)
+  language    Language @relation(fields: [language_id], references: [id])
+
+  // Creator of the game
+  creator_id String
+  creator    User   @relation("game_creator", fields: [creator_id], references: [id])
+
+  // Relations
+  game_players   GamePlayer[] // Players in this game
+  game_questions GameQuestion[] // Questions used in this game
+  game_answers   GameAnswer[] // All answers given in this game
+
+  @@map("games") // Table name in database
+}
+
+model GamePlayer {
+  id         String   @id @default(cuid()) // Unique identifier
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  game_id String
+  game    Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
+
+  user_id String
+  user    User   @relation(fields: [user_id], references: [id])
+
+  // Player stats for this game
+  score           Int @default(0) // Total points earned in this game
+  correct_answers Int @default(0) // Number of correct answers
+  wrong_answers   Int @default(0) // Number of wrong answers
+  skipped_answers Int @default(0) // Number of skipped answers
+
+  // Player position and turn order
+  player_order Int // Order in which player joined (1, 2, 3, 4)
+  final_rank   Int? // Final ranking when game ends (1st, 2nd, 3rd, 4th)
+
+  // Game answers by this player
+  game_answers GameAnswer[]
+
+  @@unique([game_id, user_id]) // A user can only be in a game once
+  @@unique([game_id, player_order]) // Each position in a game is unique
+  @@map("game_players") // Table name in database
+}
+
+model GameQuestion {
+  id         String   @id @default(cuid()) // Unique identifier
+  created_at DateTime @default(now())
+
+  game_id String
+  game    Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
+
+  question_id String
+  question    Question @relation(fields: [question_id], references: [id])
+
+  // Question order in the game
+  question_order Int // Order of this question in the game (1, 2, 3, etc.)
+
+  // For Grid Style - which player selected this question
+  selected_by_player_id String? // ID of player who selected this question (Grid Style only)
+  selected_by_player    User?   @relation(fields: [selected_by_player_id], references: [id])
+
+  // Points available for this question (based on difficulty)
+  points_available Int // Points that can be earned for correct answer
+
+  // Timing
+  time_limit   Int? // Time limit for this specific question (seconds)
+  started_at   DateTime? // When this question was presented
+  completed_at DateTime? // When all players finished answering
+
+  // Game answers for this question
+  game_answers GameAnswer[]
+
+  @@unique([game_id, question_order]) // Each question order in a game is unique
+  @@map("game_questions") // Table name in database
+}
+
+model GameAnswer {
+  id         String   @id @default(cuid()) // Unique identifier
+  created_at DateTime @default(now())
+
+  game_id String
+  game    Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
+
+  game_player_id String
+  game_player    GamePlayer @relation(fields: [game_player_id], references: [id], onDelete: Cascade)
+
+  game_question_id String
+  game_question    GameQuestion @relation(fields: [game_question_id], references: [id], onDelete: Cascade)
+
+  question_id String
+  question    Question @relation(fields: [question_id], references: [id])
+
+  // Player's answer
+  selected_answer_id String? // ID of the answer the player selected
+  selected_answer    Answer? @relation(fields: [selected_answer_id], references: [id])
+
+  // Answer details
+  is_correct    Boolean @default(false) // Whether the answer was correct
+  points_earned Int     @default(0) // Points earned for this answer
+  time_taken    Int? // Time taken to answer (in seconds)
+
+  // Answer status
+  is_skipped  Boolean   @default(false) // Whether the player skipped this question
+  answered_at DateTime? // When the player submitted their answer
+
+  @@unique([game_player_id, game_question_id]) // A player can only answer each question once
+  @@map("game_answers") // Table name in database
+}
+
+// ---------End Game schema---------
