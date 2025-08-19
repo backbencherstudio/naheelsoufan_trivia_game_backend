@@ -129,6 +129,20 @@ export class CategoryService {
               name: true,
             },
           },
+          questions: {
+            select: {
+              id: true,
+              text: true,
+              time: true,
+              points: true,
+              answers: {
+                select: {
+                  id: true,
+                  text: true,
+                },
+              },
+            },
+          },
         },
       });
 

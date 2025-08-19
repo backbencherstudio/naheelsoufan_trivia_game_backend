@@ -41,15 +41,15 @@ model User {
   approved_at  DateTime?
   availability String?
 
-  email      String? @unique
-  username   String? @unique
-  name       String? @db.VarChar(255)
-  first_name String? @db.VarChar(255)
-  last_name  String? @db.VarChar(255)
-  password   String? @db.VarChar(255)
-  domain     String? @unique
-  avatar     String?
- language     String @default("English") // User's language preference
+  email         String?   @unique
+  username      String?   @unique
+  name          String?   @db.VarChar(255)
+  first_name    String?   @db.VarChar(255)
+  last_name     String?   @db.VarChar(255)
+  password      String?   @db.VarChar(255)
+  domain        String?   @unique
+  avatar        String?
+  language      String    @default("English") // User's language preference
   phone_number  String?
   country       String?
   state         String?
@@ -516,9 +516,9 @@ model Category {
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
-  language    Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  games       Game          @relation(fields: [game_id], references: [id], onDelete: Cascade) // Relation with Game model
-  questions   Question[] // Related questions
+  language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  games        Game          @relation(fields: [game_id], references: [id], onDelete: Cascade) // Relation with Game model
+  questions    Question[] // Related questions
   leaderboards Leaderboard[]
 
   @@map("categories") // Table name in database
@@ -578,7 +578,8 @@ model Game {
   status String?  @default("active")
 
   // Game settings
-  max_players Int @default(8) // Maximum number of players (up to 4)
+  max_players  Int @default(8) // Maximum number of players (up to 4)
+  player_count Int @default(0) // Current number of players in the game
 
   // For Grid Style - all categories are available, no specific category selected
   language_id String // Foreign key to Language model (game language)
