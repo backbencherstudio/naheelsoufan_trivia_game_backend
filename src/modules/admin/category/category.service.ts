@@ -50,7 +50,7 @@ export class CategoryService {
   }
 
   // Get all categories with optional search
-  async findAll(searchQuery: string | null) {
+  async findAll(searchQuery: string | null, page: number, limit: number) {
     try {
       const whereClause = {};
       if (searchQuery) {
@@ -58,6 +58,10 @@ export class CategoryService {
           { name: { contains: searchQuery, mode: 'insensitive' } },
         ];
       }
+
+      const total = await this.prisma.category.count({
+        where: whereClause,
+      });
 
       const categories = await this.prisma.category.findMany({
         where: whereClause,
@@ -83,10 +87,22 @@ export class CategoryService {
         }
       }
 
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
       return {
         success: true,
         message: categories.length ? 'Categories retrieved successfully' : 'No categories found',
         data: categories,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
       };
     } catch (error) {
       return {
