@@ -10,6 +10,8 @@ import { CategoryModule } from './category/category.module';
 import { DifficultyModule } from './difficulty/difficulty.module';
 import { QuestionTypeModule } from './question-type/question-type.module';
 import { QuestionModule } from './question/question.module';
+import { GameModule } from './game/game.module';
+import { GamePlayerModule } from './game-player/game-player.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { QuestionModule } from './question/question.module';
     DifficultyModule,
     QuestionTypeModule,
     QuestionModule,
+    GameModule,
+    GamePlayerModule,
   ],
 })
 export class AdminModule {}
