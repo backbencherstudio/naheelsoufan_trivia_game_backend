@@ -82,7 +82,6 @@ model User {
   roles                Role[]
   role_users           RoleUser[]
   payment_transactions PaymentTransaction[]
-  subscriptions        Subscription[]
 
   game_players GamePlayer[] // Games this user is playing in
   rooms        Room[]
@@ -243,7 +242,6 @@ model PaymentTransaction {
   order_id String?
 
   subscription_id String?
-  subscription    Subscription? @relation(fields: [subscription_id], references: [id])
 
   type             String?  @default("order")
   withdraw_via     String?  @default("wallet")
@@ -444,24 +442,22 @@ model UserSetting {
 //   @@map("posts")
 // }
 
-model Subscription {
-  id         String   @id @default(cuid()) // Unique identifier for subscription
-  user_id    String // Foreign key for the User
-  type       String // e.g., Premium, Standard, Platinum
-  games      Int // Number of games allowed
-  questions  Int // Number of questions allowed
-  players    Int // Number of players allowed
-  price      Float // Price of the subscription
-  startDate  DateTime
-  endDate    DateTime
-  status     String // e.g., active, expired
+model SubscriptionType {
+  id        String @id @default(cuid()) // Unique identifier for subscription
+  type      String // e.g., Premium, Standard, Platinum
+  games     Int // Number of games allowed
+  questions Int // Number of questions allowed
+  players   Int // Number of players allowed
+  price     Float // Price of the subscription
+  status    String // e.g., active, expired
+
+  language_id String
+  language    Language @relation(fields: [language_id], references: [id])
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  user                 User                 @relation(fields: [user_id], references: [id], onDelete: Cascade) // Relation with User
-  payment_transactions PaymentTransaction[]
-
-  @@map("subscriptions") // Table name in database
+  @@map("subscription_type") // Table name in database
 }
 
 model Language {
@@ -472,11 +468,12 @@ model Language {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  categories     Category[]
-  question_types QuestionType[]
-  difficulties   Difficulty[]
-  questions      Question[]
-  games          Game[] // Games that use this language
+  categories         Category[]
+  question_types     QuestionType[]
+  difficulties       Difficulty[]
+  questions          Question[]
+  games              Game[] // Games that use this language
+  subscription_types SubscriptionType[]
 
   @@map("languages") // Table name in database
 }
