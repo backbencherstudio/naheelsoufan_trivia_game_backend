@@ -468,7 +468,7 @@ model Language {
   id         String   @id @default(cuid()) // Unique identifier for the language
   name       String // e.g., English, Arabic
   code       String // e.g., en, ar
-  file_url   String? // The language file url
+  file_url   String? // The language JSON file url
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

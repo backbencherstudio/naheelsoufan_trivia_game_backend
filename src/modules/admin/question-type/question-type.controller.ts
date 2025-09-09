@@ -23,7 +23,7 @@ import { Role } from '../../../common/guard/role/role.enum';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Question Types')
-@Controller('question-types')
+@Controller('admin/question-types')
 export class QuestionTypeController {
   constructor(private readonly questionTypeService: QuestionTypeService) { }
 
@@ -47,10 +47,21 @@ export class QuestionTypeController {
 
   @ApiOperation({ summary: 'Read all question types' })
   @Get()
-  async findAll(@Query() query: { q?: string }) {
+  async findAll(@Query() query: {
+    q?: string;
+    page?: string;
+    limit?: string;
+    sort?: string;
+    order?: string;
+  }) {
     try {
-      const searchQuery = query.q;  // Optional search query
-      const questionTypes = await this.questionTypeService.findAll(searchQuery);
+      const searchQuery = query.q || null;  // Optional search query
+      const page = parseInt(query.page) || 1;  // Default to page 1
+      const limit = parseInt(query.limit) || 10;  // Default to 10 items per page
+      const sort = query.sort || 'created_at';  // Default sort by created_at
+      const order = query.order || 'desc';  // Default order descending
+
+      const questionTypes = await this.questionTypeService.findAll(searchQuery, page, limit, sort, order);
       return questionTypes;
     } catch (error) {
       return {

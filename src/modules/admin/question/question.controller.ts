@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Body, Param, Patch, Delete, Query, UploadedFiles, UseInterceptors, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Delete, Query, UploadedFiles, UseInterceptors, Req, UseGuards, UploadedFile, Res } from '@nestjs/common';
 import { QuestionService } from './question.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
@@ -9,7 +9,7 @@ import { Roles } from '../../../common/guard/role/roles.decorator';
 import { Role } from '../../../common/guard/role/role.enum';
 
 @ApiTags('Questions')
-@Controller('questions')
+@Controller('admin/questions')
 export class QuestionController {
   constructor(private readonly questionService: QuestionService) { }
 
@@ -40,6 +40,58 @@ export class QuestionController {
         success: false,
         message: error.message,
       };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Import questions from file' })
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file'))
+  async importQuestions(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    try {
+      if (!file) {
+        return {
+          success: false,
+          message: 'No file uploaded',
+        };
+      }
+
+      const result = await this.questionService.importQuestions(file);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Export all questions' })
+  @Get('export')
+  async exportQuestions(@Res() res: any) {
+    try {
+      const result = await this.questionService.exportQuestions();
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      // Set headers for file download
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename=questions-export.json');
+
+      return res.send(result.data);
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 
