@@ -572,13 +572,30 @@ export class GamePlayerService {
                 throw new NotFoundException('No questions found for selected category and difficulty');
             }
 
-            // Determine how many questions to fetch
+            // Determine how many questions to fetch (default to 10, max 10)
             const questionLimit = questionsDto.question_count
-                ? Math.min(questionsDto.question_count, totalAvailableQuestions)
-                : totalAvailableQuestions;
+                ? Math.min(questionsDto.question_count, 10, totalAvailableQuestions)
+                : Math.min(10, totalAvailableQuestions);
 
-            const questions = await this.prisma.question.findMany({
+            // Get all question IDs first for random selection
+            const allQuestionIds = await this.prisma.question.findMany({
                 where: whereClause,
+                select: {
+                    id: true,
+                }
+            });
+
+            // Randomly shuffle and select the required number of questions
+            const shuffledIds = allQuestionIds.sort(() => 0.5 - Math.random());
+            const selectedIds = shuffledIds.slice(0, questionLimit).map(q => q.id);
+
+            // Fetch the selected questions with full details
+            const questions = await this.prisma.question.findMany({
+                where: {
+                    id: {
+                        in: selectedIds
+                    }
+                },
                 select: {
                     id: true,
                     text: true,
@@ -606,11 +623,9 @@ export class GamePlayerService {
                         }
                     }
                 },
-                take: questionLimit,
-                orderBy: [
-                    { points: 'asc' },
-                    { created_at: 'asc' }
-                ]
+                orderBy: {
+                    points: 'asc' // Still order by points for consistency
+                }
             });
 
             // Add file URLs for questions and answers

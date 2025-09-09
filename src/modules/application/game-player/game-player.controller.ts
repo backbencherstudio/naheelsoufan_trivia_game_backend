@@ -133,6 +133,26 @@ export class GamePlayerController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get game questions with category, difficulty, and question count' })
+  @Get('get-questions/:gameId')
+  async getGameQuestions(
+    @Param('gameId') gameId: string,
+    @Query() questionsDto: GetGameQuestionsDto,
+    @Req() req: any,
+  ) {
+    try {
+      const userId = req.user.userId;
+      const result = await this.gamePlayerService.getGameQuestions(userId, gameId, questionsDto);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Answer a question in game' })
   @Post('answer/:gameId')
   async answerQuestion(
@@ -254,26 +274,6 @@ export class GamePlayerController {
     try {
       const userId = req.user.userId;
       const result = await this.gamePlayerService.startGame(userId, startGameDto);
-      return result;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get game questions with category, difficulty, and question count' })
-  @Get('get-questions/:gameId')
-  async getGameQuestions(
-    @Param('gameId') gameId: string,
-    @Query() questionsDto: GetGameQuestionsDto,
-    @Req() req: any,
-  ) {
-    try {
-      const userId = req.user.userId;
-      const result = await this.gamePlayerService.getGameQuestions(userId, gameId, questionsDto);
       return result;
     } catch (error) {
       return {
