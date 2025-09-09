@@ -23,7 +23,7 @@ import { Role } from '../../../common/guard/role/role.enum';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Difficulty')
-@Controller('difficulties')
+@Controller('admin/difficulties')
 export class DifficultyController {
   constructor(private readonly difficultyService: DifficultyService) { }
 
@@ -47,10 +47,21 @@ export class DifficultyController {
 
   @ApiOperation({ summary: 'Read all difficulty levels' })
   @Get()
-  async findAll(@Query() query: { q?: string }) {
+  async findAll(@Query() query: {
+    q?: string;
+    page?: string;
+    limit?: string;
+    sort?: string;
+    order?: string;
+  }) {
     try {
-      const searchQuery = query.q;  // Optional search query
-      const difficulties = await this.difficultyService.findAll();
+      const searchQuery = query.q || null;  // Optional search query
+      const page = parseInt(query.page) || 1;  // Default to page 1
+      const limit = parseInt(query.limit) || 10;  // Default to 10 items per page
+      const sort = query.sort || 'created_at';  // Default sort by created_at
+      const order = query.order || 'desc';  // Default order descending
+
+      const difficulties = await this.difficultyService.findAll(searchQuery, page, limit, sort, order);
       return difficulties;
     } catch (error) {
       return {

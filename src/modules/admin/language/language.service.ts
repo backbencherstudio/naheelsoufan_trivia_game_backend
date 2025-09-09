@@ -8,7 +8,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class LanguageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // Create a new language
   async create(createLanguageDto: CreateLanguageDto, file: Express.Multer.File) {
@@ -48,9 +48,12 @@ export class LanguageService {
     }
   }
 
-  // Get all languages with optional search
-  async findAll(searchQuery: string | null) {
+  // Get all languages with pagination and search
+  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string) {
     try {
+      const skip = (page - 1) * limit;
+
+      // Construct the search filter based on query
       const whereClause = {};
       if (searchQuery) {
         whereClause['OR'] = [
@@ -59,14 +62,24 @@ export class LanguageService {
         ];
       }
 
+      // Count total records for pagination
+      const total = await this.prisma.language.count({ where: whereClause });
+
+      // Query the languages with pagination, sorting, and filtering
       const languages = await this.prisma.language.findMany({
         where: whereClause,
+        skip: skip,
+        take: limit,
+        orderBy: {
+          [sort]: order,  // Dynamically sort by the field and order provided
+        },
         select: {
           id: true,
           name: true,
           code: true,
           file_url: true,
           created_at: true,
+          updated_at: true,
         },
       });
 
@@ -77,10 +90,23 @@ export class LanguageService {
         }
       }
 
+      // Pagination metadata calculation
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
       return {
         success: true,
         message: languages.length ? 'Languages retrieved successfully' : 'No languages found',
         data: languages,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
       };
     } catch (error) {
       return {

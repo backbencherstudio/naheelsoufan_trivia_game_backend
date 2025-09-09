@@ -34,10 +34,28 @@ export class DifficultyService {
     }
   }
 
-  // Get all difficulty levels
-  async findAll() {
+  // Get all difficulty levels with pagination and search
+  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string) {
     try {
+      const skip = (page - 1) * limit;
+
+      // Construct the search filter based on query
+      const whereClause = {};
+      if (searchQuery) {
+        whereClause['name'] = { contains: searchQuery, mode: 'insensitive' };
+      }
+
+      // Count total records for pagination
+      const total = await this.prisma.difficulty.count({ where: whereClause });
+
+      // Query the difficulties with pagination, sorting, and filtering
       const difficulties = await this.prisma.difficulty.findMany({
+        where: whereClause,
+        skip: skip,
+        take: limit,
+        orderBy: {
+          [sort]: order,  // Dynamically sort by the field and order provided
+        },
         select: {
           id: true,
           name: true,
@@ -52,10 +70,23 @@ export class DifficultyService {
         },
       });
 
+      // Pagination metadata calculation
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
       return {
         success: true,
         message: difficulties.length ? 'Difficulties retrieved successfully' : 'No difficulties found',
         data: difficulties,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
       };
     } catch (error) {
       return {

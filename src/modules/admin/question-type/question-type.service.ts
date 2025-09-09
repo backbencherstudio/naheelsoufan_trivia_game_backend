@@ -34,16 +34,28 @@ export class QuestionTypeService {
     }
   }
 
-  // Get all question types
-  async findAll(searchQuery: string | null) {
+  // Get all question types with pagination and search
+  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string) {
     try {
+      const skip = (page - 1) * limit;
+
+      // Construct the search filter based on query
       const whereClause = {};
       if (searchQuery) {
         whereClause['name'] = { contains: searchQuery, mode: 'insensitive' };
       }
 
+      // Count total records for pagination
+      const total = await this.prisma.questionType.count({ where: whereClause });
+
+      // Query the question types with pagination, sorting, and filtering
       const questionTypes = await this.prisma.questionType.findMany({
         where: whereClause,
+        skip: skip,
+        take: limit,
+        orderBy: {
+          [sort]: order,  // Dynamically sort by the field and order provided
+        },
         select: {
           id: true,
           name: true,
@@ -58,12 +70,25 @@ export class QuestionTypeService {
         },
       });
 
+      // Pagination metadata calculation
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
       return {
         success: true,
         message: questionTypes.length
           ? 'Question types retrieved successfully'
           : 'No question types found',
         data: questionTypes,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
       };
     } catch (error) {
       return {
