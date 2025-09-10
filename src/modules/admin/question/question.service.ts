@@ -13,7 +13,7 @@ export class QuestionService {
   async create(createQuestionDto: CreateQuestionDto, questionFile: Express.Multer.File, answerFiles: Express.Multer.File[]) {
     try {
       const { answers, ...questionData } = createQuestionDto;
-     
+
 
       // Handle file upload for the question
       if (questionFile) {
@@ -72,17 +72,17 @@ export class QuestionService {
   async findAll(q: string, page: number, limit: number, sort: string, order: string, filter: any) {
     try {
       const skip = (page - 1) * limit;
-  
+
       // Construct the search filter based on query
       const searchFilter = {};
-  
+
       if (q) {
         searchFilter['OR'] = [
           { text: { contains: q, mode: 'insensitive' } },
           { answers: { some: { text: { contains: q, mode: 'insensitive' } } } },
         ];
       }
-  
+
       // Apply additional filters like category, language, difficulty, question type
       if (filter) {
         if (filter.category_id) searchFilter['category_id'] = filter.category_id;
@@ -90,10 +90,10 @@ export class QuestionService {
         if (filter.difficulty_id) searchFilter['difficulty_id'] = filter.difficulty_id;
         if (filter.question_type_id) searchFilter['question_type_id'] = filter.question_type_id;
       }
-  
+
       // Count total records for pagination
       const total = await this.prisma.question.count({ where: searchFilter });
-  
+
       // Query the questions with pagination, sorting, and filtering
       const questions = await this.prisma.question.findMany({
         where: searchFilter,
@@ -119,7 +119,7 @@ export class QuestionService {
           answers: { select: { id: true, text: true, is_correct: true, file_url: true } },
         },
       });
-  
+
       // Add file URLs for questions and answers
       for (const question of questions) {
         if (question.file_url) {
@@ -133,12 +133,12 @@ export class QuestionService {
           }
         }
       }
-  
+
       // Pagination metadata calculation
       const totalPages = Math.ceil(total / limit);
       const hasNextPage = page < totalPages;
       const hasPreviousPage = page > 1;
-  
+
       return {
         success: true,
         message: questions.length ? 'Questions retrieved successfully' : 'No questions found',
@@ -375,6 +375,186 @@ export class QuestionService {
       return {
         success: false,
         message: `Error deleting question and answers: ${error.message}`,
+      };
+    }
+  }
+
+  // Import questions from uploaded file
+  async importQuestions(file: Express.Multer.File) {
+    try {
+      // Validate file type
+      if (!file.mimetype.includes('json') && !file.originalname.endsWith('.json')) {
+        throw new Error('Only JSON files are allowed for question import');
+      }
+
+      // Parse JSON content
+      let questionsData;
+      try {
+        const fileContent = file.buffer.toString('utf8');
+        questionsData = JSON.parse(fileContent);
+      } catch (jsonError) {
+        throw new Error('Invalid JSON file format');
+      }
+
+      // Validate JSON structure
+      if (!Array.isArray(questionsData)) {
+        throw new Error('JSON file must contain an array of questions');
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      // Process each question
+      for (let i = 0; i < questionsData.length; i++) {
+        const questionData = questionsData[i];
+
+        try {
+          // Validate required fields
+          if (!questionData.text || !questionData.category_id || !questionData.language_id ||
+            !questionData.difficulty_id || !questionData.question_type_id || !questionData.answers) {
+            throw new Error(`Missing required fields in question ${i + 1}`);
+          }
+
+          if (!Array.isArray(questionData.answers) || questionData.answers.length === 0) {
+            throw new Error(`Question ${i + 1} must have at least one answer`);
+          }
+
+          // Check if at least one answer is correct
+          const hasCorrectAnswer = questionData.answers.some(answer => answer.is_correct === true);
+          if (!hasCorrectAnswer) {
+            throw new Error(`Question ${i + 1} must have at least one correct answer`);
+          }
+
+          // Create question
+          const question = await this.prisma.question.create({
+            data: {
+              text: questionData.text,
+              category_id: questionData.category_id,
+              language_id: questionData.language_id,
+              difficulty_id: questionData.difficulty_id,
+              question_type_id: questionData.question_type_id,
+              time: questionData.time || 30,
+              points: questionData.points || 10,
+              free_bundle: questionData.free_bundle || false,
+              firebase: questionData.firebase || false, // Should be boolean, not string
+            },
+          });
+
+          // Create answers
+          const answersData = questionData.answers.map(answer => ({
+            text: answer.text,
+            is_correct: answer.is_correct || false,
+            question_id: question.id,
+          }));
+
+          await this.prisma.answer.createMany({
+            data: answersData,
+          });
+
+          successCount++;
+        } catch (questionError) {
+          errorCount++;
+          errors.push(`Question ${i + 1}: ${questionError.message}`);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Import completed: ${successCount} questions imported successfully, ${errorCount} failed`,
+        data: {
+          total_processed: questionsData.length,
+          successful: successCount,
+          failed: errorCount,
+          errors: errors,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error importing questions: ${error.message}`,
+      };
+    }
+  }
+
+  // Export all questions
+  async exportQuestions() {
+    try {
+    
+      const questions = await this.prisma.question.findMany({
+        select: {
+          id: true,
+          text: true,
+          time: true,
+          points: true,
+          free_bundle: true,
+          firebase: true,
+          created_at: true,
+          updated_at: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          language: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+          difficulty: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          question_type: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          answers: {
+            select: {
+              id: true,
+              text: true,
+              is_correct: true,
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      // Format data for export
+      const exportData = questions.map(question => ({
+        text: question.text,
+        category_id: question.category.id,
+        language_id: question.language.id,
+        difficulty_id: question.difficulty.id,
+        question_type_id: question.question_type.id,
+        time: question.time,
+        points: question.points,
+        free_bundle: question.free_bundle,
+        firebase: question.firebase,
+        answers: question.answers.map(answer => ({
+          text: answer.text,
+          is_correct: answer.is_correct,
+        })),
+      }));
+
+      return {
+        success: true,
+        message: `${questions.length} questions exported successfully`,
+        data: exportData,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error exporting questions: ${error.message}`,
       };
     }
   }

@@ -20,12 +20,12 @@ import { Roles } from '../../../common/guard/role/roles.decorator';
 import { Role } from '../../../common/guard/role/role.enum';
 
 @ApiTags('Game')
-@Controller('admin/games')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@Controller('games')
 export class GameController {
   constructor(private readonly gameService: GameService) { }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)  // Restrict to admin roles
   @ApiOperation({ summary: 'Create a new game' })
   @Post()
   async create(
@@ -72,7 +72,8 @@ export class GameController {
     }
   }
 
- 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)  // Restrict to admin roles
   @ApiOperation({ summary: 'Update a game' })
   @Patch(':id')
   async update(
@@ -90,6 +91,8 @@ export class GameController {
     }
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)  // Restrict to admin roles
   @ApiOperation({ summary: 'Delete a game' })
   @Delete(':id')
   async remove(@Param('id') id: string) {

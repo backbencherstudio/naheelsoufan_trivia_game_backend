@@ -82,11 +82,11 @@ model User {
   roles                Role[]
   role_users           RoleUser[]
   payment_transactions PaymentTransaction[]
-  subscriptions        Subscription[]
 
   game_players GamePlayer[] // Games this user is playing in
   rooms        Room[]
   leaderboards Leaderboard[]
+  games        Game[]
 
   @@map("users")
 }
@@ -243,7 +243,6 @@ model PaymentTransaction {
   order_id String?
 
   subscription_id String?
-  subscription    Subscription? @relation(fields: [subscription_id], references: [id])
 
   type             String?  @default("order")
   withdraw_via     String?  @default("wallet")
@@ -444,39 +443,38 @@ model UserSetting {
 //   @@map("posts")
 // }
 
-model Subscription {
-  id         String   @id @default(cuid()) // Unique identifier for subscription
-  user_id    String // Foreign key for the User
-  type       String // e.g., Premium, Standard, Platinum
-  games      Int // Number of games allowed
-  questions  Int // Number of questions allowed
-  players    Int // Number of players allowed
-  price      Float // Price of the subscription
-  startDate  DateTime
-  endDate    DateTime
-  status     String // e.g., active, expired
+model SubscriptionType {
+  id        String @id @default(cuid()) // Unique identifier for subscription
+  type      String // e.g., Premium, Standard, Platinum
+  games     Int // Number of games allowed
+  questions Int // Number of questions allowed
+  players   Int // Number of players allowed
+  price     Float // Price of the subscription
+  status    String // e.g., active, expired
+
+  language_id String
+  language    Language @relation(fields: [language_id], references: [id])
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  user                 User                 @relation(fields: [user_id], references: [id], onDelete: Cascade) // Relation with User
-  payment_transactions PaymentTransaction[]
-
-  @@map("subscriptions") // Table name in database
+  @@map("subscription_type") // Table name in database
 }
 
 model Language {
   id         String   @id @default(cuid()) // Unique identifier for the language
   name       String // e.g., English, Arabic
   code       String // e.g., en, ar
-  file_url   String? // The language file url
+  file_url   String? // The language JSON file url
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  categories     Category[]
-  question_types QuestionType[]
-  difficulties   Difficulty[]
-  questions      Question[]
-  games          Game[] // Games that use this language
+  categories         Category[]
+  question_types     QuestionType[]
+  difficulties       Difficulty[]
+  questions          Question[]
+  games              Game[] // Games that use this language
+  subscription_types SubscriptionType[]
 
   @@map("languages") // Table name in database
 }
@@ -511,13 +509,11 @@ model Category {
   id          String   @id @default(cuid()) // Unique identifier for category
   name        String // e.g., Science, History
   language_id String // Foreign key to Language model
-  game_id     String // Foreign key to Game model
   image       String? // Image for the category (optional)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
   language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  games        Game          @relation(fields: [game_id], references: [id], onDelete: Cascade) // Relation with Game model
   questions    Question[] // Related questions
   leaderboards Leaderboard[]
 
@@ -585,9 +581,11 @@ model Game {
   language_id String // Foreign key to Language model (game language)
   language    Language @relation(fields: [language_id], references: [id])
 
+  host_id String?
+  host    User?   @relation(fields: [host_id], references: [id])
+
   // Relations
   game_players GamePlayer[] // Players in this game
-  categories   Category[] // Categories in this game
   rooms        Room[]
   leaderboards Leaderboard[]
 
@@ -602,8 +600,8 @@ model GamePlayer {
   game_id String
   game    Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
 
-  user_id String
-  user    User   @relation(fields: [user_id], references: [id])
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
 
   room_id String? // Optional: if user joined through a room
   room    Room?   @relation(fields: [room_id], references: [id])

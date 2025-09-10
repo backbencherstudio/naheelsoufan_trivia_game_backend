@@ -24,7 +24,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 @Roles(Role.ADMIN)
 @Controller('admin/user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @ApiResponse({ description: 'Create a user' })
   @Post()
@@ -43,14 +43,35 @@ export class UserController {
   @ApiResponse({ description: 'Get all users' })
   @Get()
   async findAll(
-    @Query() query: { q?: string; type?: string; approved?: string },
+    @Query() query: {
+      q?: string;
+      type?: string;
+      approved?: string;
+      role?: string; // host or player
+      page?: string;
+      limit?: string;
+      sort?: string;
+      order?: string;
+    },
   ) {
     try {
-      const q = query.q;
+      const searchQuery = query.q || null;
       const type = query.type;
       const approved = query.approved;
+      const role = query.role; // host or player
+      const page = parseInt(query.page) || 1;
+      const limit = parseInt(query.limit) || 10;
+      const sort = query.sort || 'created_at';
+      const order = query.order || 'desc';
 
-      const users = await this.userService.findAll({ q, type, approved });
+      const users = await this.userService.findAll(
+        searchQuery,
+        page,
+        limit,
+        sort,
+        order,
+        { type, approved, role }
+      );
       return users;
     } catch (error) {
       return {
