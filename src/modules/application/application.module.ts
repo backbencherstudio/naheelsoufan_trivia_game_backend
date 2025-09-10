@@ -7,11 +7,13 @@ import { GamePlayerModule } from './game-player/game-player.module';
 import { GridStyleModule } from './grid-style/grid-style.module';
 
 @Module({
-  imports: [NotificationModule,
+  imports: [
+    NotificationModule,
     ContactModule,
     FaqModule,
     GameModule,
     GamePlayerModule,
-    GridStyleModule],
+    GridStyleModule
+  ],
 })
 export class ApplicationModule { }
