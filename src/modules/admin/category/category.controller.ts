@@ -25,7 +25,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 @ApiTags('Category')
 @Controller('admin/categories')
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: CategoryService) { }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)  // Restrict to admin roles

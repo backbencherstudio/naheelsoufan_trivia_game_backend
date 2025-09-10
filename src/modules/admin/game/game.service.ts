@@ -70,6 +70,13 @@ export class GameService {
               code: true,
             },
           },
+          host: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           _count: {
             select: {
               game_players: true,
@@ -78,6 +85,7 @@ export class GameService {
             },
           },
         },
+
         orderBy: {
           created_at: 'desc',
         },
