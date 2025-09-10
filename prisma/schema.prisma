@@ -86,6 +86,7 @@ model User {
   game_players GamePlayer[] // Games this user is playing in
   rooms        Room[]
   leaderboards Leaderboard[]
+  games        Game[]
 
   @@map("users")
 }
@@ -508,13 +509,11 @@ model Category {
   id          String   @id @default(cuid()) // Unique identifier for category
   name        String // e.g., Science, History
   language_id String // Foreign key to Language model
-  game_id     String // Foreign key to Game model
   image       String? // Image for the category (optional)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
   language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  games        Game          @relation(fields: [game_id], references: [id], onDelete: Cascade) // Relation with Game model
   questions    Question[] // Related questions
   leaderboards Leaderboard[]
 
@@ -582,9 +581,11 @@ model Game {
   language_id String // Foreign key to Language model (game language)
   language    Language @relation(fields: [language_id], references: [id])
 
+  host_id String?
+  host    User?   @relation(fields: [host_id], references: [id])
+
   // Relations
   game_players GamePlayer[] // Players in this game
-  categories   Category[] // Categories in this game
   rooms        Room[]
   leaderboards Leaderboard[]
 
@@ -599,8 +600,8 @@ model GamePlayer {
   game_id String
   game    Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
 
-  user_id String
-  user    User   @relation(fields: [user_id], references: [id])
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
 
   room_id String? // Optional: if user joined through a room
   room    Room?   @relation(fields: [room_id], references: [id])

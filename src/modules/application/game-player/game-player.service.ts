@@ -397,25 +397,25 @@ export class GamePlayerService {
                             code: true,
                         }
                     },
-                    categories: {
-                        select: {
-                            id: true,
-                            name: true,
-                            image: true,
-                            language_id: true,
-                            _count: {
-                                select: {
-                                    questions: true
-                                }
-                            }
-                        }
-                    }
                 }
             });
 
             if (!game) {
                 throw new NotFoundException('Game not found');
             }
+
+            const categories = await this.prisma.category.findMany({
+                where: {
+                    language_id: game.language_id,
+                },
+                include: {
+                    _count: {
+                        select: {
+                            questions: true
+                        }
+                    }
+                }
+            });
 
             return {
                 success: true,
@@ -427,13 +427,13 @@ export class GamePlayerService {
                         status: game.status,
                         language: game.language,
                     },
-                    categories: game.categories.map(category => ({
+                    categories: categories.map(category => ({
                         id: category.id,
                         name: category.name,
                         image: category.image,
                         total_questions: category._count.questions,
                     })),
-                    total_categories: game.categories.length,
+                    total_categories: categories.length,
                 },
             };
         } catch (error) {
@@ -541,7 +541,6 @@ export class GamePlayerService {
             const category = await this.prisma.category.findFirst({
                 where: {
                     id: questionsDto.category_id,
-                    game_id: gameId
                 },
                 include: {
                     language: {

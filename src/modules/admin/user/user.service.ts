@@ -9,7 +9,7 @@ import { DateHelper } from '../../../common/helper/date.helper';
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createUserDto: CreateUserDto) {
     try {
@@ -34,36 +34,82 @@ export class UserService {
     }
   }
 
-  async findAll({
-    q,
-    type,
-    approved,
-  }: {
-    q?: string;
-    type?: string;
-    approved?: string;
-  }) {
+  // Get all users with pagination, search, and role filtering
+  async findAll(
+    searchQuery: string | null,
+    page: number,
+    limit: number,
+    sort: string,
+    order: string,
+    filters: {
+      type?: string;
+      approved?: string;
+      role?: string; // host or player
+    }
+  ) {
     try {
-      const where_condition = {};
-      if (q) {
-        where_condition['OR'] = [
-          { name: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
+      const skip = (page - 1) * limit;
+      const whereClause = {};
+
+      // Basic filters
+      if (filters.type) {
+        whereClause['type'] = filters.type;
+      }
+
+      if (filters.approved) {
+        whereClause['approved_at'] =
+          filters.approved === 'approved' ? { not: null } : { equals: null };
+      }
+
+      // Role-based filtering (host or player)
+      if (filters.role) {
+        if (filters.role.toLowerCase() === 'host') {
+          // Users who have created rooms (hosts)
+          whereClause['rooms'] = {
+            some: {} // Has at least one room
+          };
+        } else if (filters.role.toLowerCase() === 'player') {
+          // Users who have joined games as players
+          whereClause['game_players'] = {
+            some: {} // Has at least one game player record
+          };
+        }
+      }
+
+      // Search functionality
+      if (searchQuery) {
+        const searchConditions = [
+          { name: { contains: searchQuery, mode: 'insensitive' } },
+          { email: { contains: searchQuery, mode: 'insensitive' } },
         ];
+
+        if (Object.keys(whereClause).length > 0) {
+          // Combine existing filters with search using AND
+          whereClause['AND'] = [
+            { ...whereClause },
+            { OR: searchConditions }
+          ];
+
+          // Clear the direct conditions since they're now in AND
+          if (filters.type) delete whereClause['type'];
+          if (filters.approved) delete whereClause['approved_at'];
+          if (filters.role && filters.role.toLowerCase() === 'host') delete whereClause['rooms'];
+          if (filters.role && filters.role.toLowerCase() === 'player') delete whereClause['game_players'];
+        } else {
+          whereClause['OR'] = searchConditions;
+        }
       }
 
-      if (type) {
-        where_condition['type'] = type;
-      }
+      // Count total records for pagination
+      const total = await this.prisma.user.count({ where: whereClause });
 
-      if (approved) {
-        where_condition['approved_at'] =
-          approved == 'approved' ? { not: null } : { equals: null };
-      }
-
+      // Query users with pagination, sorting, and filtering
       const users = await this.prisma.user.findMany({
-        where: {
-          ...where_condition,
+        where: whereClause,
+        skip: skip,
+        take: limit,
+        orderBy: {
+          [sort]: order,
         },
         select: {
           id: true,
@@ -75,17 +121,38 @@ export class UserService {
           approved_at: true,
           created_at: true,
           updated_at: true,
+          // Include counts for role identification
+          _count: {
+            select: {
+              rooms: true, // Number of rooms created (host activity)
+              game_players: true, // Number of games played (player activity)
+            }
+          }
         },
       });
 
+      // Pagination metadata calculation
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
       return {
         success: true,
+        message: users.length ? 'Users retrieved successfully' : 'No users found',
         data: users,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
       };
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: `Error fetching users: ${error.message}`,
       };
     }
   }
