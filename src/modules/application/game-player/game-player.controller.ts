@@ -24,7 +24,10 @@ export class GamePlayerController {
   constructor(private readonly gamePlayerService: GamePlayerService) { }
 
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Join a game' })
+  @ApiOperation({
+    summary: 'Join a game',
+    description: 'Join a game as a single user. If you are the host and provide user_ids, you can add multiple players when joining your own game.'
+  })
   @Post('join')
   async joinGame(
     @Body() joinGameDto: JoinGameDto,
@@ -274,6 +277,39 @@ export class GamePlayerController {
     try {
       const userId = req.user.userId;
       const result = await this.gamePlayerService.startGame(userId, startGameDto);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'End game and show final rankings with leaderboard' })
+  @Post('end-game')
+  async endGame(
+    @Body() endGameDto: EndGameDto,
+    @Req() req: any,
+  ) {
+    try {
+      const userId = req.user.userId;
+      const result = await this.gamePlayerService.endGame(userId, endGameDto);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @ApiOperation({ summary: 'Get comprehensive game results with rankings and leaderboard' })
+  @Get('results/:gameId')
+  async getGameResults(@Param('gameId') gameId: string) {
+    try {
+      const result = await this.gamePlayerService.getGameResults(gameId);
       return result;
     } catch (error) {
       return {

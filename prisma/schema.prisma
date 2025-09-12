@@ -573,10 +573,6 @@ model Game {
   mode   GameMode @default(QUICK_GAME) // Game mode: Quick Game or Grid Style
   status String?  @default("active")
 
-  // Game settings
-  max_players  Int @default(8) // Maximum number of players (up to 4)
-  player_count Int @default(0) // Current number of players in the game
-
   // For Grid Style - all categories are available, no specific category selected
   language_id String // Foreign key to Language model (game language)
   language    Language @relation(fields: [language_id], references: [id])

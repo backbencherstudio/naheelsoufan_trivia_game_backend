@@ -4,12 +4,14 @@ import { ContactModule } from './contact/contact.module';
 import { FaqModule } from './faq/faq.module';
 import { GameModule } from './game/game.module';
 import { GamePlayerModule } from './game-player/game-player.module';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
 
 @Module({
   imports: [NotificationModule,
     ContactModule,
     FaqModule,
     GameModule,
-    GamePlayerModule,],
+    GamePlayerModule,
+    LeaderboardModule,],
 })
 export class ApplicationModule { }
