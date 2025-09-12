@@ -15,9 +15,15 @@ export class GamePlayerService {
     // Join a game
     async joinGame(userId: string, joinGameDto: JoinGameDto) {
         try {
+            const { game_id } = joinGameDto
+
+            console.log('=============game id=======================');
+            console.log(joinGameDto);
+            console.log('====================================');
+
             // Check if game exists and is active
             const game = await this.prisma.game.findUnique({
-                where: { id: joinGameDto.game_id },
+                where: { id: game_id },
                 include: {
                     _count: {
                         select: { game_players: true }
@@ -123,6 +129,9 @@ export class GamePlayerService {
                 data: gamePlayer,
             };
         } catch (error) {
+            console.log('=============error msg=======================');
+            console.log(error?.message);
+            console.log('====================================');
             return {
                 success: false,
                 message: `Error joining game: ${error.message}`,

@@ -92,6 +92,11 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new CustomExceptionFilter());
 
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true
+  }))
+
   // storage setup
   SojebStorage.config({
     driver: 'local',
