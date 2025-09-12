@@ -18,7 +18,7 @@ export class GamePlayerService {
             // Check if game exists and is active
             // Check if game exists
             const game = await this.prisma.game.findUnique({
-                where: { id: 'game_id' },
+                where: { id: game_id },
                 include: {
                     _count: {
                         select: { game_players: true }
