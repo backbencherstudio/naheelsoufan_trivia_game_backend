@@ -22,6 +22,7 @@ export class GamePlayerService {
             console.log('====================================');
 
             // Check if game exists and is active
+            // Check if game exists
             const game = await this.prisma.game.findUnique({
                 where: { id: game_id },
                 include: {
@@ -35,12 +36,21 @@ export class GamePlayerService {
                 throw new NotFoundException('Game not found');
             }
 
-            if (game.status !== 'active') {
+            const isHost = game.host_id === userId;
+
+            // Check game status - allow host to join their own game even if not active
+            if (!isHost && game.status !== 'active') {
                 throw new BadRequestException('Game is not active');
             }
 
-            // Check if game is full
-            if (game._count.game_players >= game.max_players) {
+            // If host is joining and has user_ids, handle host adding players scenario
+            if (isHost && joinGameDto.user_ids && joinGameDto.user_ids.length > 0) {
+                return await this.hostJoinWithPlayers(userId, joinGameDto, game);
+            }
+
+            // Check if game is full for single user joining (assume max 8 players)
+            const maxPlayers = 8;
+            if (game._count.game_players >= maxPlayers) {
                 throw new BadRequestException('Game is full');
             }
 
@@ -106,7 +116,6 @@ export class GamePlayerService {
                             id: true,
                             mode: true,
                             status: true,
-                            max_players: true,
                         }
                     },
                     room: {
@@ -120,13 +129,18 @@ export class GamePlayerService {
 
             await this.prisma.game.update({
                 where: { id: joinGameDto.game_id },
-                data: { player_count: { increment: 1 } }
+                data: {
+                    ...(isHost && { status: 'active' }) // Set to active when host joins
+                }
             });
 
             return {
                 success: true,
-                message: 'Successfully joined the game',
-                data: gamePlayer,
+                message: isHost ? 'Host successfully joined the game' : 'Successfully joined the game',
+                data: {
+                    ...gamePlayer,
+                    is_host: isHost,
+                },
             };
         } catch (error) {
             console.log('=============error msg=======================');
@@ -137,6 +151,153 @@ export class GamePlayerService {
                 message: `Error joining game: ${error.message}`,
             };
         }
+    }
+
+    // Host joins their game and adds other players
+    private async hostJoinWithPlayers(userId: string, joinGameDto: JoinGameDto, game: any) {
+        // Remove duplicates from userIds array and ensure host is included
+        const uniqueUserIds = [...new Set([userId, ...joinGameDto.user_ids])];
+
+        // Check if adding all users would exceed max_players
+        const maxPlayers = 8;
+        const totalPlayersAfterJoining = game._count.game_players + uniqueUserIds.length;
+        if (totalPlayersAfterJoining > maxPlayers) {
+            throw new BadRequestException(
+                `Cannot add ${uniqueUserIds.length} users. Game allows maximum ${maxPlayers} players. Currently has ${game._count.game_players} players.`
+            );
+        }
+
+        // Check if any users are already in the game
+        const existingPlayers = await this.prisma.gamePlayer.findMany({
+            where: {
+                game_id: joinGameDto.game_id,
+                user_id: { in: uniqueUserIds }
+            },
+            select: {
+                user_id: true,
+                user: {
+                    select: {
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (existingPlayers.length > 0) {
+            const existingUserNames = existingPlayers.map(p => p.user.name || p.user.email).join(', ');
+            throw new BadRequestException(`Some users are already in this game: ${existingUserNames}`);
+        }
+
+        // Verify all user IDs exist
+        const users = await this.prisma.user.findMany({
+            where: { id: { in: uniqueUserIds } },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                avatar: true,
+            }
+        });
+
+        if (users.length !== uniqueUserIds.length) {
+            const foundUserIds = users.map(u => u.id);
+            const missingUserIds = uniqueUserIds.filter(id => !foundUserIds.includes(id));
+            throw new BadRequestException(`Some users not found: ${missingUserIds.join(', ')}`);
+        }
+
+        // Handle room joining if room_code is provided
+        let roomId = null;
+        if (joinGameDto.room_code) {
+            const room = await this.prisma.room.findUnique({
+                where: { code: joinGameDto.room_code },
+                include: { game: true }
+            });
+
+            if (!room || room.game_id !== joinGameDto.game_id) {
+                throw new BadRequestException('Invalid room code for this game');
+            }
+            roomId = room.id;
+        }
+
+        // Create game players for all users (host first, then others)
+        const sortedUserIds = [userId, ...uniqueUserIds.filter(id => id !== userId)];
+        const gamePlayersData = sortedUserIds.map((playerId, index) => ({
+            game_id: joinGameDto.game_id,
+            user_id: playerId,
+            room_id: roomId,
+            player_order: game._count.game_players + index + 1,
+        }));
+
+        // Use transaction to ensure all players are added or none
+        const result = await this.prisma.$transaction(async (tx) => {
+            // Create all game players
+            const createdPlayers = await Promise.all(
+                gamePlayersData.map(data =>
+                    tx.gamePlayer.create({
+                        data,
+                        select: {
+                            id: true,
+                            game_id: true,
+                            user_id: true,
+                            room_id: true,
+                            score: true,
+                            correct_answers: true,
+                            wrong_answers: true,
+                            skipped_answers: true,
+                            player_order: true,
+                            final_rank: true,
+                            created_at: true,
+                            updated_at: true,
+                            user: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    email: true,
+                                    avatar: true,
+                                }
+                            }
+                        }
+                    })
+                )
+            );
+
+            // Set game to active
+            await tx.game.update({
+                where: { id: joinGameDto.game_id },
+                data: {
+                    status: 'active'
+                }
+            });
+
+            return createdPlayers;
+        });
+
+        // Get updated game info
+        const updatedGame = await this.prisma.game.findUnique({
+            where: { id: joinGameDto.game_id },
+            include: {
+                _count: {
+                    select: { game_players: true }
+                }
+            }
+        });
+
+        const hostPlayer = result.find(p => p.user_id === userId);
+
+        return {
+            success: true,
+            message: `Host joined and added ${uniqueUserIds.length - 1} additional players to the game`,
+            data: {
+                game: updatedGame,
+                host_player: hostPlayer,
+                all_players: result,
+                total_players: uniqueUserIds.length,
+                remaining_slots: 8 - updatedGame._count.game_players,
+                is_host: true,
+                added_players: result.filter(p => p.user_id !== userId),
+            },
+        };
     }
 
     // Leave a game
@@ -157,10 +318,7 @@ export class GamePlayerService {
                 where: { id: gamePlayer.id }
             });
 
-            await this.prisma.game.update({
-                where: { id: leaveGameDto.game_id },
-                data: { player_count: { decrement: 1 } }
-            });
+            // Game player count is automatically managed by the relation
 
             return {
                 success: true,
@@ -204,7 +362,6 @@ export class GamePlayerService {
                         select: {
                             id: true,
                             mode: true,
-                            player_count: true,
                         }
                     }
                 }
@@ -253,7 +410,6 @@ export class GamePlayerService {
                         select: {
                             id: true,
                             mode: true,
-                            player_count: true,
                         }
                     },
                 },
@@ -514,8 +670,8 @@ export class GamePlayerService {
                         id: game.id,
                         mode: game.mode,
                         status: 'in_progress',
-                        max_players: game.max_players,
-                        current_players: game.player_count,
+                        max_players: 8,
+                        current_players: game.game_players.length,
                         language: game.language,
                     },
                     players: game.game_players,
@@ -684,6 +840,292 @@ export class GamePlayerService {
             return {
                 success: false,
                 message: `Error fetching questions: ${error.message}`,
+            };
+        }
+    }
+
+    // End game - calculate final rankings and create leaderboard entries
+    async endGame(userId: string, endGameDto: EndGameDto) {
+        try {
+            // Verify user is in the game
+            const gamePlayer = await this.prisma.gamePlayer.findFirst({
+                where: {
+                    game_id: endGameDto.game_id,
+                    user_id: userId
+                }
+            });
+
+            if (!gamePlayer) {
+                throw new NotFoundException('Player not found in this game');
+            }
+
+            // Check if game is already completed
+            const game = await this.prisma.game.findUnique({
+                where: { id: endGameDto.game_id },
+                include: {
+                    language: {
+                        select: {
+                            id: true,
+                            name: true,
+                            code: true,
+                        }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            if (game.status === 'completed') {
+                // Game already ended, just return the results
+                return await this.getGameResults(endGameDto.game_id);
+            }
+
+            // Get all players in the game
+            const allPlayers = await this.prisma.gamePlayer.findMany({
+                where: { game_id: endGameDto.game_id },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            avatar: true,
+                        }
+                    }
+                },
+                orderBy: [
+                    { score: 'desc' },
+                    { correct_answers: 'desc' },
+                    { player_order: 'asc' }
+                ]
+            });
+
+            // Calculate final rankings
+            let currentRank = 1;
+            let previousScore = null;
+            let previousCorrect = null;
+            const rankedPlayers = [];
+
+            for (let i = 0; i < allPlayers.length; i++) {
+                const player = allPlayers[i];
+
+                // If score and correct answers are different from previous player, update rank
+                if (previousScore !== null &&
+                    (player.score !== previousScore || player.correct_answers !== previousCorrect)) {
+                    currentRank = i + 1;
+                }
+
+                // Update player's final rank in database
+                await this.prisma.gamePlayer.update({
+                    where: { id: player.id },
+                    data: { final_rank: currentRank }
+                });
+
+                rankedPlayers.push({
+                    ...player,
+                    final_rank: currentRank
+                });
+
+                previousScore = player.score;
+                previousCorrect = player.correct_answers;
+            }
+
+            // Update game status to completed
+            await this.prisma.game.update({
+                where: { id: endGameDto.game_id },
+                data: { status: 'completed' }
+            });
+
+            // Create leaderboard entries for all players
+            const leaderboardPromises = rankedPlayers.map(async (player) => {
+                // Check if leaderboard entry already exists for this user and game
+                const existingEntry = await this.prisma.leaderboard.findFirst({
+                    where: {
+                        user_id: player.user_id,
+                        game_id: endGameDto.game_id
+                    }
+                });
+
+                if (!existingEntry) {
+                    return this.prisma.leaderboard.create({
+                        data: {
+                            user_id: player.user_id,
+                            game_id: endGameDto.game_id,
+                            score: player.score,
+                            correct: player.correct_answers,
+                            wrong: player.wrong_answers,
+                            skipped: player.skipped_answers,
+                            games_played: 1,
+                            mode: game.mode,
+                        }
+                    });
+                }
+                return existingEntry;
+            });
+
+            await Promise.all(leaderboardPromises);
+
+            // Get comprehensive game results
+            const gameResults = await this.getGameResults(endGameDto.game_id);
+
+            return {
+                success: true,
+                message: 'Game ended successfully',
+                data: {
+                    ...gameResults.data,
+                    game_status: 'completed',
+                    end_time: new Date(),
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error ending game: ${error.message}`,
+            };
+        }
+    }
+
+    // Get comprehensive game results with rankings and leaderboard
+    async getGameResults(gameId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    language: {
+                        select: {
+                            id: true,
+                            name: true,
+                            code: true,
+                        }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Get final rankings
+            const finalRankings = await this.prisma.gamePlayer.findMany({
+                where: { game_id: gameId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            avatar: true,
+                        }
+                    }
+                },
+                orderBy: [
+                    { final_rank: 'asc' },
+                    { score: 'desc' },
+                    { correct_answers: 'desc' },
+                    { player_order: 'asc' }
+                ]
+            });
+
+            // Get leaderboard entries for this game
+            const leaderboardEntries = await this.prisma.leaderboard.findMany({
+                where: { game_id: gameId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            avatar: true,
+                        }
+                    }
+                },
+                orderBy: [
+                    { score: 'desc' },
+                    { correct: 'desc' },
+                    { created_at: 'asc' }
+                ]
+            });
+
+            // Calculate statistics
+            const totalQuestions = finalRankings.reduce((sum, player) =>
+                sum + player.correct_answers + player.wrong_answers + player.skipped_answers, 0
+            ) / finalRankings.length;
+
+            const averageScore = finalRankings.reduce((sum, player) => sum + player.score, 0) / finalRankings.length;
+
+            const topPerformer = finalRankings[0];
+            const winner = finalRankings.find(player => player.final_rank === 1);
+
+            return {
+                success: true,
+                message: 'Game results retrieved successfully',
+                data: {
+                    game_info: {
+                        id: game.id,
+                        mode: game.mode,
+                        status: game.status,
+                        language: game.language,
+                        total_players: finalRankings.length,
+                        max_players: 8,
+                    },
+                    final_rankings: finalRankings.map((player, index) => ({
+                        position: player.final_rank || (index + 1),
+                        player_id: player.id,
+                        user: player.user,
+                        score: player.score,
+                        correct_answers: player.correct_answers,
+                        wrong_answers: player.wrong_answers,
+                        skipped_answers: player.skipped_answers,
+                        total_questions: player.correct_answers + player.wrong_answers + player.skipped_answers,
+                        accuracy: player.correct_answers + player.wrong_answers > 0
+                            ? ((player.correct_answers / (player.correct_answers + player.wrong_answers)) * 100).toFixed(2) + '%'
+                            : '0%',
+                        player_order: player.player_order,
+                        created_at: player.created_at,
+                    })),
+                    leaderboard: leaderboardEntries.map((entry, index) => ({
+                        leaderboard_position: index + 1,
+                        user: entry.user,
+                        score: entry.score,
+                        correct: entry.correct,
+                        wrong: entry.wrong,
+                        skipped: entry.skipped,
+                        games_played: entry.games_played,
+                        mode: entry.mode,
+                        created_at: entry.created_at,
+                    })),
+                    game_statistics: {
+                        winner: winner ? {
+                            user: winner.user,
+                            score: winner.score,
+                            accuracy: winner.correct_answers + winner.wrong_answers > 0
+                                ? ((winner.correct_answers / (winner.correct_answers + winner.wrong_answers)) * 100).toFixed(2) + '%'
+                                : '0%'
+                        } : null,
+                        top_performer: topPerformer ? {
+                            user: topPerformer.user,
+                            score: topPerformer.score,
+                            correct_answers: topPerformer.correct_answers,
+                        } : null,
+                        average_score: Math.round(averageScore * 100) / 100,
+                        total_questions_per_player: Math.round(totalQuestions),
+                        completion_rate: finalRankings.length > 0 ? '100%' : '0%',
+                    },
+                    podium: {
+                        first_place: finalRankings.find(p => p.final_rank === 1) || null,
+                        second_place: finalRankings.find(p => p.final_rank === 2) || null,
+                        third_place: finalRankings.find(p => p.final_rank === 3) || null,
+                    }
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error fetching game results: ${error.message}`,
             };
         }
     }

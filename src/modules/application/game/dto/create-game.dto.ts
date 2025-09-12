@@ -22,6 +22,10 @@ export class CreateGameDto {
     @IsNotEmpty()
     language_id: string;  // Foreign key to Language model (required)
 
+    @IsString()
+    @IsOptional()
+    user_id: string;  // Foreign key to User model (required)
+
     @IsOptional()
     created_at?: Date;  // Optional, automatically set by Prisma if not provided
 
