@@ -8,20 +8,26 @@ export class GameService {
   constructor(private readonly prisma: PrismaService) { }
 
   // Create a new game
-  async create(createGameDto: CreateGameDto) {
+  async create(createGameDto: CreateGameDto, user_id: string) {
     try {
       const game = await this.prisma.game.create({
         data: {
           ...createGameDto,
+          host_id: user_id,
         },
         select: {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           language_id: true,
           created_at: true,
-          updated_at: true,
+          host: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          }
         },
       });
 
@@ -60,7 +66,6 @@ export class GameService {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -105,7 +110,6 @@ export class GameService {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -181,7 +185,6 @@ export class GameService {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           language_id: true,
           created_at: true,
           updated_at: true,

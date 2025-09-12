@@ -21,11 +21,11 @@ import { Role } from '../../../common/guard/role/role.enum';
 
 @ApiTags('Game')
 @Controller('games')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.USER, Role.ADMIN)
 export class GameController {
   constructor(private readonly gameService: GameService) { }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)  // Restrict to admin roles
   @ApiOperation({ summary: 'Create a new game' })
   @Post()
   async create(
@@ -33,7 +33,8 @@ export class GameController {
     @Req() req: any,
   ) {
     try {
-      const game = await this.gameService.create(createGameDto);
+      const user_id = req.user.userId;
+      const game = await this.gameService.create(createGameDto, user_id);
       return game;  // Return the created game data
     } catch (error) {
       return {
