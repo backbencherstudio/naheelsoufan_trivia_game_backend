@@ -424,12 +424,12 @@ export class GamePlayerService {
     }
 
     // Answer a question (for gameplay)
-    async answerQuestion(userId: string, gameId: string, answerDto: AnswerQuestionDto) {
+    async answerQuestion(gameId: string, answerDto: AnswerQuestionDto) {
         try {
             const gamePlayer = await this.prisma.gamePlayer.findFirst({
                 where: {
-                    game_id: gameId,
-                    user_id: userId
+                    // game_id: gameId,
+                    user_id: answerDto.user_id,
                 }
             });
 
@@ -692,10 +692,10 @@ export class GamePlayerService {
                 throw new NotFoundException('Player not found in this game');
             }
 
-            // Verify category belongs to the game
-            const category = await this.prisma.category.findFirst({
+            // Verify categories belong to the game
+            const categories = await this.prisma.category.findMany({
                 where: {
-                    id: questionsDto.category_id,
+                    id: { in: questionsDto.category_ids },
                 },
                 include: {
                     language: {
@@ -708,13 +708,19 @@ export class GamePlayerService {
                 }
             });
 
-            if (!category) {
-                throw new NotFoundException('Category not found in this game');
+            if (categories.length === 0) {
+                throw new NotFoundException('No valid categories found');
             }
 
-            // Get questions based on selection
+            if (categories.length !== questionsDto.category_ids.length) {
+                const foundCategoryIds = categories.map(c => c.id);
+                const missingCategoryIds = questionsDto.category_ids.filter(id => !foundCategoryIds.includes(id));
+                throw new NotFoundException(`Categories not found: ${missingCategoryIds.join(', ')}`);
+            }
+
+            // Get questions from all selected categories
             const whereClause = {
-                category_id: questionsDto.category_id,
+                category_id: { in: questionsDto.category_ids },
                 difficulty_id: questionsDto.difficulty_id,
             };
 
@@ -723,31 +729,109 @@ export class GamePlayerService {
             });
 
             if (totalAvailableQuestions === 0) {
-                throw new NotFoundException('No questions found for selected category and difficulty');
+                throw new NotFoundException('No questions found for selected categories and difficulty');
             }
 
-            // Determine how many questions to fetch (default to 10, max 10)
-            const questionLimit = questionsDto.question_count
+            // Determine total questions to fetch (default to 10, max 10)
+            const totalQuestionLimit = questionsDto.question_count
                 ? Math.min(questionsDto.question_count, 10, totalAvailableQuestions)
                 : Math.min(10, totalAvailableQuestions);
 
-            // Get all question IDs first for random selection
-            const allQuestionIds = await this.prisma.question.findMany({
-                where: whereClause,
-                select: {
-                    id: true,
-                }
-            });
+            // Calculate questions per category (distribute evenly)
+            const questionsPerCategory = Math.ceil(totalQuestionLimit / questionsDto.category_ids.length);
 
-            // Randomly shuffle and select the required number of questions
-            const shuffledIds = allQuestionIds.sort(() => 0.5 - Math.random());
-            const selectedIds = shuffledIds.slice(0, questionLimit).map(q => q.id);
+            // Get questions from each category separately to ensure distribution
+            const allSelectedQuestions = [];
+            const categoryResults = [];
+
+            for (const categoryId of questionsDto.category_ids) {
+                const categoryWhereClause = {
+                    category_id: categoryId,
+                    difficulty_id: questionsDto.difficulty_id,
+                };
+
+                // Count available questions for this category
+                const categoryQuestionCount = await this.prisma.question.count({
+                    where: categoryWhereClause
+                });
+
+                // Store category info for response (even if no questions available)
+                const categoryInfo = categories.find(c => c.id === categoryId);
+
+                if (categoryQuestionCount > 0) {
+                    // Get question IDs for this category
+                    const categoryQuestionIds = await this.prisma.question.findMany({
+                        where: categoryWhereClause,
+                        select: {
+                            id: true,
+                        }
+                    });
+
+                    // Randomly shuffle and select questions for this category
+                    const shuffledIds = categoryQuestionIds.sort(() => 0.5 - Math.random());
+                    const categoryLimit = Math.min(questionsPerCategory, categoryQuestionCount);
+                    const selectedCategoryIds = shuffledIds.slice(0, categoryLimit).map(q => q.id);
+
+                    allSelectedQuestions.push(...selectedCategoryIds);
+
+                    categoryResults.push({
+                        category: categoryInfo,
+                        questions_count: selectedCategoryIds.length,
+                        available_count: categoryQuestionCount
+                    });
+                } else {
+                    // Add category even if no questions available (for debugging)
+                    categoryResults.push({
+                        category: categoryInfo,
+                        questions_count: 0,
+                        available_count: 0
+                    });
+                }
+            }
+
+            // If we have fewer questions than requested, try to get more from available categories
+            let finalSelectedIds = allSelectedQuestions;
+
+            if (finalSelectedIds.length < totalQuestionLimit) {
+                // Try to get more questions from categories that have available questions
+                const categoriesWithQuestions = categoryResults.filter(cr => cr.available_count > cr.questions_count);
+
+                for (const categoryResult of categoriesWithQuestions) {
+                    if (finalSelectedIds.length >= totalQuestionLimit) break;
+
+                    const additionalNeeded = totalQuestionLimit - finalSelectedIds.length;
+                    const maxAdditionalFromCategory = categoryResult.available_count - categoryResult.questions_count;
+                    const additionalToGet = Math.min(additionalNeeded, maxAdditionalFromCategory);
+
+                    if (additionalToGet > 0) {
+                        // Get additional questions from this category
+                        const additionalQuestions = await this.prisma.question.findMany({
+                            where: {
+                                category_id: categoryResult.category.id,
+                                difficulty_id: questionsDto.difficulty_id,
+                                id: { notIn: finalSelectedIds }
+                            },
+                            select: { id: true },
+                            take: additionalToGet
+                        });
+
+                        const additionalIds = additionalQuestions.map(q => q.id);
+                        finalSelectedIds.push(...additionalIds);
+
+                        // Update the category result
+                        categoryResult.questions_count += additionalIds.length;
+                    }
+                }
+            }
+
+            // Shuffle the final selection and limit to requested amount
+            finalSelectedIds = finalSelectedIds.sort(() => 0.5 - Math.random()).slice(0, totalQuestionLimit);
 
             // Fetch the selected questions with full details
             const questions = await this.prisma.question.findMany({
                 where: {
                     id: {
-                        in: selectedIds
+                        in: finalSelectedIds
                     }
                 },
                 select: {
@@ -756,6 +840,13 @@ export class GamePlayerService {
                     points: true,
                     time: true,
                     file_url: true,
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                            image: true,
+                        }
+                    },
                     difficulty: {
                         select: {
                             id: true,
@@ -796,20 +887,34 @@ export class GamePlayerService {
                 }
             }
 
+            // Create informative message based on results
+            const totalCategoriesRequested = questionsDto.category_ids.length;
+            const categoriesWithQuestions = categoryResults.filter(cr => cr.questions_count > 0).length;
+            const categoriesWithoutQuestions = categoryResults.filter(cr => cr.questions_count === 0);
+
+            let message = `Questions retrieved successfully from ${categoriesWithQuestions} of ${totalCategoriesRequested} categories`;
+            if (categoriesWithoutQuestions.length > 0) {
+                const missingCategoryNames = categoriesWithoutQuestions.map(cr => cr.category?.name || 'Unknown').join(', ');
+                message += `. Note: No questions available for difficulty '${questions[0]?.difficulty?.name || 'Unknown'}' in categories: ${missingCategoryNames}`;
+            }
+
             return {
                 success: true,
-                message: 'Questions retrieved successfully',
+                message: message,
                 data: {
                     selected_criteria: {
-                        category: {
-                            id: category.id,
-                            name: category.name,
-                            image: category.image,
-                        },
+                        categories: categoryResults,
                         difficulty: questions[0]?.difficulty || null,
-                        requested_questions: questionsDto.question_count || 'all',
+                        requested_questions: questionsDto.question_count || 'default',
                         actual_questions: questions.length,
                         total_available: totalAvailableQuestions,
+                        questions_per_category: questionsPerCategory,
+                        debug_info: {
+                            categories_requested: questionsDto.category_ids,
+                            categories_found: categories.map(c => ({ id: c.id, name: c.name })),
+                            categories_with_questions: categoriesWithQuestions,
+                            categories_without_questions: categoriesWithoutQuestions.length,
+                        }
                     },
                     questions: questions.map((question, index) => ({
                         question_number: index + 1,
@@ -818,12 +923,19 @@ export class GamePlayerService {
                         points: question.points,
                         time_limit: question.time,
                         file_url: question.file_url,
+                        category: question.category,
                         difficulty: question.difficulty,
                         question_type: question.question_type,
                         answers: question.answers,
                         is_answered: false, // Initially all questions are unanswered
                     })),
                     total_questions: questions.length,
+                    categories_breakdown: categoryResults.map(cr => ({
+                        category_id: cr.category.id,
+                        category_name: cr.category.name,
+                        questions_selected: cr.questions_count,
+                        questions_available: cr.available_count,
+                    })),
                 },
             };
         } catch (error) {
@@ -964,7 +1076,7 @@ export class GamePlayerService {
                 success: true,
                 message: 'Game ended successfully',
                 data: {
-                    ...gameResults.data,
+                    // ...gameResults.data,
                     game_status: 'completed',
                     end_time: new Date(),
                 }
