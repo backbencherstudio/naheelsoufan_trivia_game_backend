@@ -1,11 +1,13 @@
 import { HttpException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { GetCategoryDto } from './dto/get-question.dto';
+import { AnswerQuestionDto } from './dto/answer-question.dto';
 
 @Injectable()
 export class GridStyleService {
     constructor(private readonly prisma: PrismaService) { }
 
-    async listDifficultyLevel(categoryIds: string[]) {
+    async listDifficultyLevel(game_id: string, categoryIds: string[]) {
         try {
             const categories = await this.prisma.category.findMany({
                 where: { id: { in: categoryIds } },
@@ -19,6 +21,9 @@ export class GridStyleService {
                     },
                 },
             });
+            const players = await this.prisma.gamePlayer.findMany({
+                where: { game_id: game_id }
+            })
 
             const foundIds = new Set(categories.map(c => c.id));
             const missingIds = categoryIds.filter(id => !foundIds.has(id));
@@ -53,13 +58,76 @@ export class GridStyleService {
             return {
                 success: true,
                 message: 'Data fetched successfully.',
-                data: result,
+                data: {
+                    categories: result,
+                    players
+                },
             };
         } catch (error) {
             if (error instanceof HttpException) {
                 throw error;
             }
-            throw new InternalServerErrorException(`Error joining game: ${error.message}`);
+            throw new InternalServerErrorException(`Error getting difficulty level: ${error.message}`);
+        }
+    }
+
+
+    async getQuestionByCategory(query: GetCategoryDto) {
+        try {
+            const questions = await this.prisma.question.findMany({
+                where: {
+                    category_id: query.category_id,
+                    difficulty_id: query.difficulty_id,
+                    player_answers: {
+                        none: {
+                            game_player: {
+                                game_id: query.game_id,
+                            },
+                        },
+                    },
+                },
+                include: {
+                    answers: true,
+                },
+            });
+
+            if (!questions.length) return null;
+            const randomIndex = Math.floor(Math.random() * questions.length);
+            const question = questions[randomIndex];
+            return {
+                success: true,
+                message: 'Data fetched successfully.',
+                data: question,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            throw new InternalServerErrorException(`Error getting question: ${error.message}`);
+        }
+    }
+
+
+    async answerQuestion(payload: AnswerQuestionDto) {
+        try {
+            const players = await this.prisma.gamePlayer.findMany({
+                where: { game_id: payload.game_id }
+            })
+
+
+
+            return {
+                success: true,
+                message: 'Answer a question successfully.',
+                data: {
+                    players
+                },
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            throw new InternalServerErrorException(`Error answering question: ${error.message}`);
         }
     }
 }

@@ -9,6 +9,10 @@ import {
 } from 'class-validator';
 
 export class DifficultyDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string
+
     @Transform(({ value }) =>
         typeof value === 'string' ? value.split(',').map(v => v.trim()) : value
     )
