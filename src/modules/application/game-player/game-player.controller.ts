@@ -136,7 +136,10 @@ export class GamePlayerController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get game questions with category, difficulty, and question count' })
+  @ApiOperation({
+    summary: 'Get game questions with multiple categories, difficulty, and question count',
+    description: 'Retrieve questions from multiple selected categories with specified difficulty. Questions are distributed evenly across categories.'
+  })
   @Get('get-questions/:gameId')
   async getGameQuestions(
     @Param('gameId') gameId: string,
@@ -165,7 +168,7 @@ export class GamePlayerController {
   ) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.answerQuestion(userId, gameId, answerDto);
+      const result = await this.gamePlayerService.answerQuestion(gameId, answerDto);
       return result;
     } catch (error) {
       return {

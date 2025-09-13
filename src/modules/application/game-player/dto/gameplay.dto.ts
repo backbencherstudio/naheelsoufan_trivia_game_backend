@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsInt, Min, Max, IsArray, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class StartGameDto {
@@ -35,9 +35,18 @@ export class UpdateScoreDto {
 }
 
 export class GetGameQuestionsDto {
-    @IsString()
-    @IsNotEmpty()
-    category_id: string;  // Selected category
+    @IsArray()
+    @Transform(({ value }) => {
+        // Handle different input types
+        if (typeof value === 'string') {
+            return JSON.parse(value);
+        }
+        return value;
+    })
+    @ArrayMinSize(1)
+    @ArrayMaxSize(10)  // Allow up to 10 categories
+    @IsString({ each: true })
+    category_ids: string[];  // Selected categories (multiple allowed)
 
     @IsString()
     @IsNotEmpty()
@@ -46,7 +55,7 @@ export class GetGameQuestionsDto {
     @IsOptional()
     @IsInt()
     @Min(1)
-    @Max(50)
+    @Max(10)
     @Transform(({ value }) => parseInt(value))
-    question_count?: number;  // Optional: number of questions (if not provided, use all available)
+    question_count?: number;  // Optional: total number of questions (max 10, default 10)
 }
