@@ -66,8 +66,6 @@ export class GamePlayerService {
                             id: true,
                             mode: true,
                             status: true,
-                            max_players: true,
-                            player_count: true,
                             language: {
                                 select: {
                                     id: true,

@@ -1,9 +1,13 @@
-import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID, IsOptional, IsNumber } from 'class-validator';
 
 export class CreateDifficultyDto {
     @IsString()
     @IsNotEmpty()
     name: string;  // The name of the difficulty level (e.g., Easy, Medium, Extreme)
+
+    @IsNumber()
+    @IsNotEmpty()
+    points: number;
 
     @IsString()
     language_id: string;  // Foreign key to the Language model (UUID)

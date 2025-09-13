@@ -37,15 +37,7 @@ export class CategoryController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req: any,
   ) {
-    try {
-      const category = await this.categoryService.create(createCategoryDto, file);
-      return category;  // Return the created category data
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,  // Return error message if creation fails
-      };
-    }
+    return await this.categoryService.create(createCategoryDto, file)
   }
 
   @ApiOperation({ summary: 'Read all categories' })

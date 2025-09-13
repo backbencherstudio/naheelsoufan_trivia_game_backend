@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseGuards,
@@ -21,7 +22,6 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import appConfig from '../../config/app.config';
 import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('auth')
@@ -107,6 +107,9 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   async login(@Req() req: Request) {
+    console.log('====================================');
+    console.log('login...');
+    console.log('====================================');
     try {
       const user_id = req.user.id;
 
@@ -200,8 +203,8 @@ export class AuthController {
 
   // verify email to verify the email
   @ApiOperation({ summary: 'Verify email' })
-  @Post('verify-email')
-  async verifyEmail(@Body() data: VerifyEmailDto) {
+  @Get('verify-email')
+  async verifyEmail(@Query() data: VerifyEmailDto) {
     try {
       const email = data.email;
       const token = data.token;
