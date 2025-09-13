@@ -1,7 +1,5 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, HttpException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateGamePlayerDto } from './dto/create-game-player.dto';
-import { UpdateGamePlayerDto } from './dto/update-game-player.dto';
 import { JoinGameDto, LeaveGameDto } from './dto/join-game.dto';
 import { AnswerQuestionDto, SkipQuestionDto } from './dto/answer-question.dto';
 import { StartGameDto, EndGameDto, UpdateScoreDto, GetGameQuestionsDto } from './dto/gameplay.dto';
@@ -15,9 +13,12 @@ export class GamePlayerService {
     // Join a game
     async joinGame(userId: string, joinGameDto: JoinGameDto) {
         try {
+            const { game_id, user_ids, room_code } = joinGameDto
+
+            // Check if game exists and is active
             // Check if game exists
             const game = await this.prisma.game.findUnique({
-                where: { id: joinGameDto.game_id },
+                where: { id: game_id },
                 include: {
                     _count: {
                         select: { game_players: true }
@@ -37,7 +38,7 @@ export class GamePlayerService {
             }
 
             // If host is joining and has user_ids, handle host adding players scenario
-            if (isHost && joinGameDto.user_ids && joinGameDto.user_ids.length > 0) {
+            if (isHost && user_ids && user_ids.length > 0) {
                 return await this.hostJoinWithPlayers(userId, joinGameDto, game);
             }
 
@@ -50,7 +51,7 @@ export class GamePlayerService {
             // Check if user is already in the game
             const existingPlayer = await this.prisma.gamePlayer.findFirst({
                 where: {
-                    game_id: joinGameDto.game_id,
+                    game_id: game_id,
                     user_id: userId
                 }
             });
@@ -61,13 +62,13 @@ export class GamePlayerService {
 
             // Handle room joining if room_code is provided
             let roomId = null;
-            if (joinGameDto.room_code) {
+            if (room_code) {
                 const room = await this.prisma.room.findUnique({
-                    where: { code: joinGameDto.room_code },
+                    where: { code: room_code },
                     include: { game: true }
                 });
 
-                if (!room || room.game_id !== joinGameDto.game_id) {
+                if (!room || room.game_id !== game_id) {
                     throw new BadRequestException('Invalid room code for this game');
                 }
                 roomId = room.id;
@@ -121,7 +122,7 @@ export class GamePlayerService {
             });
 
             await this.prisma.game.update({
-                where: { id: joinGameDto.game_id },
+                where: { id: game_id },
                 data: {
                     ...(isHost && { status: 'active' }) // Set to active when host joins
                 }
@@ -136,10 +137,10 @@ export class GamePlayerService {
                 },
             };
         } catch (error) {
-            return {
-                success: false,
-                message: `Error joining game: ${error.message}`,
-            };
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            throw new InternalServerErrorException(`Error joining game: ${error.message}`);
         }
     }
 

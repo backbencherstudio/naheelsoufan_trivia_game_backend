@@ -18,7 +18,6 @@ export class GameService {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           language_id: true,
           created_at: true,
           updated_at: true,
@@ -60,7 +59,6 @@ export class GameService {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -113,7 +111,6 @@ export class GameService {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -189,7 +186,6 @@ export class GameService {
           id: true,
           mode: true,
           status: true,
-          max_players: true,
           language_id: true,
           created_at: true,
           updated_at: true,

@@ -33,16 +33,8 @@ export class GamePlayerController {
     @Body() joinGameDto: JoinGameDto,
     @Req() req: any,
   ) {
-    try {
-      const userId = req.user.userId;
-      const result = await this.gamePlayerService.joinGame(userId, joinGameDto);
-      return result;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+    const userId = req.user.userId;
+    return await this.gamePlayerService.joinGame(userId, joinGameDto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -146,16 +138,8 @@ export class GamePlayerController {
     @Query() questionsDto: GetGameQuestionsDto,
     @Req() req: any,
   ) {
-    try {
-      const userId = req.user.userId;
-      const result = await this.gamePlayerService.getGameQuestions(userId, gameId, questionsDto);
-      return result;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+    const userId = req.user.userId;
+    return await this.gamePlayerService.getGameQuestions(userId, gameId, questionsDto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -259,15 +243,7 @@ export class GamePlayerController {
   @ApiOperation({ summary: 'Get available categories for game selection' })
   @Get('categories/:gameId')
   async getGameCategories(@Param('gameId') gameId: string) {
-    try {
-      const result = await this.gamePlayerService.getGameCategories(gameId);
-      return result;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+    return await this.gamePlayerService.getGameCategories(gameId);
   }
 
   @UseGuards(JwtAuthGuard)
