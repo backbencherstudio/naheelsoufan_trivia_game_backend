@@ -6,6 +6,7 @@ import { GameModule } from './game/game.module';
 import { GamePlayerModule } from './game-player/game-player.module';
 import { GridStyleModule } from './grid-style/grid-style.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
+import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
   imports: [
@@ -14,8 +15,9 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
     FaqModule,
     GameModule,
     GamePlayerModule,
+    LeaderboardModule,
+    SubscriptionModule,
     GridStyleModule,
-    LeaderboardModule
   ],
 })
 export class ApplicationModule { }

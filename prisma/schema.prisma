@@ -30,20 +30,20 @@ model Account {
 }
 
 model User {
-  id                        String               @id @default(cuid())
-  created_at                DateTime             @default(now())
-  updated_at                DateTime             @default(now())
+  id                        String         @id @default(cuid())
+  created_at                DateTime       @default(now())
+  updated_at                DateTime       @default(now())
   deleted_at                DateTime?
-  status                    Int?                 @default(1) @db.SmallInt
+  status                    Int?           @default(1) @db.SmallInt
   approved_at               DateTime?
   availability              String?
-  email                     String?              @unique
-  username                  String?              @unique
-  name                      String?              @db.VarChar(255)
-  first_name                String?              @db.VarChar(255)
-  last_name                 String?              @db.VarChar(255)
-  password                  String?              @db.VarChar(255)
-  domain                    String?              @unique
+  email                     String?        @unique
+  username                  String?        @unique
+  name                      String?        @db.VarChar(255)
+  first_name                String?        @db.VarChar(255)
+  last_name                 String?        @db.VarChar(255)
+  password                  String?        @db.VarChar(255)
+  domain                    String?        @unique
   avatar                    String?
   phone_number              String?
   country                   String?
@@ -52,30 +52,32 @@ model User {
   address                   String?
   zip_code                  String?
   gender                    String?
-  date_of_birth             DateTime?            @db.Date
-  language                  String               @default("English")
+  date_of_birth             DateTime?      @db.Date
+  language                  String         @default("English")
   billing_id                String?
-  type                      String?              @default("user")
+  type                      String?        @default("user")
   email_verified_at         DateTime?
-  is_two_factor_enabled     Int?                 @default(0)
+  is_two_factor_enabled     Int?           @default(0)
   two_factor_secret         String?
   accounts                  Account[]
-  creator_conversations     Conversation[]       @relation("creator")
-  participant_conversations Conversation[]       @relation("participant")
-  game_players              GamePlayer[]
-  games                     Game[]
-  leaderboards              Leaderboard[]
-  receiver_messages         Message[]            @relation("receiver")
-  sender_messages           Message[]            @relation("sender")
-  receiver_notifications    Notification[]       @relation("receiver")
-  sender_notifications      Notification[]       @relation("sender")
-  payment_transactions      PaymentTransaction[]
-  role_users                RoleUser[]
-  roles                     Role[]
-  rooms                     Room[]
-  ucodes                    Ucode[]
-  user_payment_methods      UserPaymentMethod[]
-  user_settings             UserSetting[]
+  creator_conversations     Conversation[] @relation("creator")
+  participant_conversations Conversation[] @relation("participant")
+  receiver_messages         Message[]      @relation("receiver")
+  sender_messages           Message[]      @relation("sender")
+  receiver_notifications    Notification[] @relation("receiver")
+  sender_notifications      Notification[] @relation("sender")
+
+  user_payment_methods UserPaymentMethod[]
+  user_settings        UserSetting[]
+  ucodes               Ucode[]
+  roles                Role[]
+  role_users           RoleUser[]
+  payment_transactions PaymentTransaction[]
+  subscriptions        Subscription[]
+  game_players         GamePlayer[] // Games this user is playing in
+  rooms                Room[]
+  leaderboards         Leaderboard[]
+  games                Game[]
 
   @@map("users")
 }
@@ -197,44 +199,50 @@ model UserPaymentMethod {
 }
 
 model PaymentTransaction {
-  id               String    @id @default(cuid())
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @default(now())
-  deleted_at       DateTime?
-  store_id         String?
-  user_id          String?
-  order_id         String?
-  subscription_id  String?
-  type             String?   @default("order")
-  withdraw_via     String?   @default("wallet")
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  store_id String?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  order_id String?
+
+  subscription_id String?
+  subscription    Subscription? @relation(fields: [subscription_id], references: [id])
+
+  type             String?  @default("order")
+  withdraw_via     String?  @default("wallet")
   provider         String?
   reference_number String?
-  status           String?   @default("pending")
+  status           String?  @default("pending")
   raw_status       String?
   amount           Decimal?
   currency         String?
   paid_amount      Decimal?
   paid_currency    String?
-  user             User?     @relation(fields: [user_id], references: [id])
 
   @@map("payment_transactions")
 }
 
 model Message {
-  id              String         @id @default(cuid())
-  created_at      DateTime       @default(now())
-  updated_at      DateTime       @default(now())
+  id              String        @id @default(cuid())
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @default(now())
   deleted_at      DateTime?
-  status          MessageStatus? @default(PENDING)
+  status          String?       @default("pending")
   sender_id       String?
   receiver_id     String?
   conversation_id String?
   attachment_id   String?
   message         String?
-  attachment      Attachment?    @relation(fields: [attachment_id], references: [id])
-  conversation    Conversation?  @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
-  receiver        User?          @relation("receiver", fields: [receiver_id], references: [id])
-  sender          User?          @relation("sender", fields: [sender_id], references: [id])
+  attachment      Attachment?   @relation(fields: [attachment_id], references: [id])
+  conversation    Conversation? @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  receiver        User?         @relation("receiver", fields: [receiver_id], references: [id])
+  sender          User?         @relation("sender", fields: [sender_id], references: [id])
 
   @@map("messages")
 }
@@ -368,114 +376,74 @@ model SubscriptionType {
   updated_at  DateTime @updatedAt
   language    Language @relation(fields: [language_id], references: [id])
 
+  subscriptions Subscription[]
+
   @@map("subscription_type")
 }
 
-model Language {
-  id                 String             @id @default(cuid())
-  name               String
-  code               String
-  created_at         DateTime           @default(now())
-  updated_at         DateTime           @updatedAt
-  file_url           String?
-  categories         Category[]
-  difficulties       Difficulty[]
-  games              Game[]
-  question_types     QuestionType[]
-  questions          Question[]
-  subscription_types SubscriptionType[]
+model Subscription {
+  id                   String @id @default(cuid()) // Unique identifier for user subscription
+  user_id              String
+  subscription_type_id String
+  status               String @default("active")
 
-  @@map("languages")
+  // Usage tracking
+  games_played_count Int @default(0) // Games played this period
+
+  payment_status           String?  @default("pending")
+  // raw status from payment provider
+  payment_raw_status       String?
+  // paid amount from payment provider
+  paid_amount              Decimal?
+  // paid currency from payment provider
+  paid_currency            String?
+  // e.g. stripe, paypal, razorpay
+  payment_provider         String?
+  // e.g. stripe payment reference id
+  payment_reference_number String?
+
+  payment_provider_charge_type String?  @default("percentage") // e.g. fixed, percentage
+  payment_provider_charge      Decimal? // e.g. stripe payment provider charge
+
+  // Relations
+  user                 User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  subscription_type    SubscriptionType     @relation(fields: [subscription_type_id], references: [id])
+  payment_transactions PaymentTransaction[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("subscriptions") // Table name in database
 }
 
-model Difficulty {
-  id          String     @id @default(cuid())
-  name        String
-  language_id String
-  points      Int?
-  created_at  DateTime   @default(now())
-  updated_at  DateTime   @updatedAt
-  language    Language   @relation(fields: [language_id], references: [id], onDelete: Cascade)
-  questions   Question[]
+// ---------Start Game schema---------
 
-  @@map("difficulties")
-}
-
-model QuestionType {
-  id          String     @id @default(cuid())
-  name        String
-  language_id String
-  created_at  DateTime   @default(now())
-  updated_at  DateTime   @updatedAt
-  language    Language   @relation(fields: [language_id], references: [id], onDelete: Cascade)
-  questions   Question[]
-
-  @@map("question_types")
-}
-
-model Category {
-  id           String        @id @default(cuid())
-  name         String
-  language_id  String
-  image        String?
-  created_at   DateTime      @default(now())
-  updated_at   DateTime      @updatedAt
-  language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade)
-  leaderboards Leaderboard[]
-  questions    Question[]
-
-  @@map("categories")
-}
-
-model Question {
-  id               String         @id @default(cuid())
-  text             String
-  category_id      String
-  language_id      String
-  difficulty_id    String
-  question_type_id String
-  file_url         String?
-  time             Int
-  free_bundle      Boolean
-  firebase         Boolean
-  points           Int
-  created_at       DateTime       @default(now())
-  updated_at       DateTime       @updatedAt
-  answers          Answer[]
-  player_answers   PlayerAnswer[]
-  category         Category       @relation(fields: [category_id], references: [id], onDelete: Cascade)
-  difficulty       Difficulty     @relation(fields: [difficulty_id], references: [id], onDelete: Cascade)
-  language         Language       @relation(fields: [language_id], references: [id], onDelete: Cascade)
-  question_type    QuestionType   @relation(fields: [question_type_id], references: [id], onDelete: Cascade)
-
-  @@map("questions")
-}
-
-model Answer {
-  id             String         @id @default(cuid())
-  question_id    String
-  text           String?
-  file_url       String?
-  is_correct     Boolean        @default(false)
-  question       Question       @relation(fields: [question_id], references: [id], onDelete: Cascade)
-  player_answers PlayerAnswer[]
-
-  @@map("answers")
+enum GameMode {
+  QUICK_GAME
+  GRID_STYLE
 }
 
 model Game {
-  id           String        @id @default(cuid())
-  created_at   DateTime      @default(now())
-  updated_at   DateTime      @updatedAt
-  mode         GameMode      @default(QUICK_GAME)
-  status       String?       @default("active")
-  language_id  String
-  host_id      String?
-  game_players GamePlayer[]
-  host         User?         @relation(fields: [host_id], references: [id])
-  language     Language      @relation(fields: [language_id], references: [id])
-  leaderboards Leaderboard[]
+  id         String   @id @default(cuid()) // Unique identifier for the game
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  mode               GameMode @default(QUICK_GAME) // Game mode: Quick Game or Grid Style
+  status             String?  @default("active")
+  is_free_quick_game Boolean  @default(true)
+  is_free_grid_style Boolean  @default(true)
+
+  // For Grid Style - all categories are available, no specific category selected
+  language_id String // Foreign key to Language model (game language)
+  language    Language @relation(fields: [language_id], references: [id])
+
+  host_id String?
+  host    User?   @relation(fields: [host_id], references: [id])
+
+  // Relations
+  game_players GamePlayer[] // Players in this game
   rooms        Room[]
+  leaderboards Leaderboard[]
 
   @@map("games")
 }
@@ -548,14 +516,100 @@ model Leaderboard {
   @@map("leaderboards")
 }
 
-enum MessageStatus {
-  PENDING
-  SENT
-  DELIVERED
-  READ
+model Language {
+  id         String   @id @default(cuid()) // Unique identifier for the language
+  name       String // e.g., English, Arabic
+  code       String // e.g., en, ar
+  file_url   String? // The language JSON file url
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  categories         Category[]
+  question_types     QuestionType[]
+  difficulties       Difficulty[]
+  questions          Question[]
+  games              Game[] // Games that use this language
+  subscription_types SubscriptionType[]
+
+  @@map("languages") // Table name in database
 }
 
-enum GameMode {
-  QUICK_GAME
-  GRID_STYLE
+model Difficulty {
+  id          String   @id @default(cuid()) // Unique identifier for difficulty level
+  name        String // e.g., Easy, Medium, Extreme
+  language_id String // Foreign key to Language model
+  points      Int // Points awarded based on difficulty of the question
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  questions Question[] // Related questions of this difficulty level
+
+  @@map("difficulties") // Table name in database
+}
+
+model QuestionType {
+  id          String   @id @default(cuid()) // Unique identifier for the question type
+  name        String // Name of the question type (e.g., Multiple Choice, True/False)
+  language_id String // Foreign key to the Language model
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  questions Question[] // Related questions of this type
+
+  @@map("question_types") // Table name in the database
+}
+
+model Category {
+  id          String   @id @default(cuid()) // Unique identifier for category
+  name        String // e.g., Science, History
+  language_id String // Foreign key to Language model
+  image       String? // Image for the category (optional)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  questions    Question[] // Related questions
+  leaderboards Leaderboard[]
+
+  @@map("categories") // Table name in database
+}
+
+model Question {
+  id               String   @id @default(cuid()) // Unique identifier for the question
+  text             String // The question text
+  category_id      String // Foreign key to Category model
+  language_id      String // Foreign key to Language model
+  difficulty_id    String // Foreign key to Difficulty model
+  question_type_id String // Foreign key to QuestionType model
+  file_url         String? // Optional file upload (e.g., image, document)
+  time             Int // Time limit for answering the question (in seconds)
+  free_bundle      Boolean // Whether this question is part of a free bundle (Yes/No)
+  firebase         Boolean // Whether this question is stored in Firebase (Yes/No)
+  points           Int // Points awarded based on difficulty of the question
+  created_at       DateTime @default(now()) // Automatically sets the creation date
+  updated_at       DateTime @updatedAt // Automatically updates the last modified date
+
+  category       Category       @relation(fields: [category_id], references: [id], onDelete: Cascade) // Relation with Category model
+  language       Language       @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  difficulty     Difficulty     @relation(fields: [difficulty_id], references: [id], onDelete: Cascade) // Relation with Difficulty model
+  question_type  QuestionType   @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
+  answers        Answer[] // Related answers to the question
+  player_answers PlayerAnswer[] // Game answers for this question
+
+  @@map("questions") // Table name in database
+}
+
+model Answer {
+  id          String  @id @default(cuid()) // Unique identifier for each answer
+  question_id String // Foreign key to Question model
+  text        String? // The answer text
+  file_url    String? // The answer file url
+  is_correct  Boolean @default(false) // Whether the answer is correct or not
+
+  question       Question       @relation(fields: [question_id], references: [id], onDelete: Cascade) // Relation with Question model
+  player_answers PlayerAnswer[] // Related game answers
+
+  @@map("answers") // Table name in database
 }
