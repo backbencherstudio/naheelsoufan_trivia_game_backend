@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
-import { QuestionsDto } from './dto/questions.dto';
+import { DifficultyDto } from './dto/difficulty.dto';
 import { GridStyleService } from './grid-style.service';
 
 @Controller('grid-style')
@@ -9,10 +9,10 @@ export class GridStyleController {
     constructor(private readonly service: GridStyleService) { }
 
     @UseGuards(JwtAuthGuard)
-    @ApiOperation({ summary: 'Get questions.' })
-    @Get('select-difficulty')
-    async getQuestion(
-        @Query() questionsDto: QuestionsDto,) {
-        return this.service.getDifficultyLevel(questionsDto.categories)
+    @ApiOperation({ summary: 'List Difficulty.' })
+    @Get('list-difficulty')
+    async listDifficulty(
+        @Query() questionsDto: DifficultyDto,) {
+        return this.service.listDifficultyLevel(questionsDto.categories)
     }
 }

@@ -5,7 +5,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class GridStyleService {
     constructor(private readonly prisma: PrismaService) { }
 
-    async getDifficultyLevel(categoryIds: string[]) {
+    async listDifficultyLevel(categoryIds: string[]) {
         try {
             const categories = await this.prisma.category.findMany({
                 where: { id: { in: categoryIds } },
@@ -29,19 +29,27 @@ export class GridStyleService {
             }
 
             const result = categories.map(cat => {
-                const difficultyMap: Record<string, number> = {};
+                const difficultyMap: Record<string, { name: string; points: number }> = {};
+
                 cat.questions.forEach(q => {
                     const diff = q.difficulty;
                     if (!diff) return;
-                    const points = q.difficulty.points ?? 10;
-                    difficultyMap[diff.name] = points;
+
+                    const points = diff.points ?? 10;
+                    difficultyMap[diff.id] = { name: diff.name, points };
                 });
 
                 return {
+                    id: cat.id,
                     name: cat.name,
-                    difficulty: Object.entries(difficultyMap).map(([name, points]) => ({ name, points })),
+                    difficulty: Object.entries(difficultyMap).map(([id, value]) => ({
+                        id,
+                        name: value.name,
+                        points: value.points,
+                    })),
                 };
             });
+
             return {
                 success: true,
                 message: 'Data fetched successfully.',

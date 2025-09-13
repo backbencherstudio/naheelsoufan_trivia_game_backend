@@ -5,9 +5,10 @@ import {
     ArrayNotEmpty,
     ArrayMinSize,
     ArrayMaxSize,
+    IsNotEmpty,
 } from 'class-validator';
 
-export class QuestionsDto {
+export class DifficultyDto {
     @Transform(({ value }) =>
         typeof value === 'string' ? value.split(',').map(v => v.trim()) : value
     )
