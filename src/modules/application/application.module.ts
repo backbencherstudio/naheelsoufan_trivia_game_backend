@@ -5,6 +5,7 @@ import { FaqModule } from './faq/faq.module';
 import { GameModule } from './game/game.module';
 import { GamePlayerModule } from './game-player/game-player.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
+import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
   imports: [NotificationModule,
@@ -12,6 +13,7 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
     FaqModule,
     GameModule,
     GamePlayerModule,
-    LeaderboardModule,],
+    LeaderboardModule,
+    SubscriptionModule,],
 })
 export class ApplicationModule { }

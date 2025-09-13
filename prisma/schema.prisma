@@ -82,11 +82,11 @@ model User {
   roles                Role[]
   role_users           RoleUser[]
   payment_transactions PaymentTransaction[]
-
-  game_players GamePlayer[] // Games this user is playing in
-  rooms        Room[]
-  leaderboards Leaderboard[]
-  games        Game[]
+  subscriptions        Subscription[]
+  game_players         GamePlayer[] // Games this user is playing in
+  rooms                Room[]
+  leaderboards         Leaderboard[]
+  games                Game[]
 
   @@map("users")
 }
@@ -243,6 +243,7 @@ model PaymentTransaction {
   order_id String?
 
   subscription_id String?
+  subscription    Subscription? @relation(fields: [subscription_id], references: [id])
 
   type             String?  @default("order")
   withdraw_via     String?  @default("wallet")
@@ -455,107 +456,47 @@ model SubscriptionType {
   language_id String
   language    Language @relation(fields: [language_id], references: [id])
 
+  subscriptions Subscription[]
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   @@map("subscription_type") // Table name in database
 }
 
-model Language {
-  id         String   @id @default(cuid()) // Unique identifier for the language
-  name       String // e.g., English, Arabic
-  code       String // e.g., en, ar
-  file_url   String? // The language JSON file url
+model Subscription {
+  id                   String @id @default(cuid()) // Unique identifier for user subscription
+  user_id              String
+  subscription_type_id String
+  status               String @default("active")
+
+  // Usage tracking
+  games_played_count Int @default(0) // Games played this period
+
+  payment_status           String?  @default("pending")
+  // raw status from payment provider
+  payment_raw_status       String?
+  // paid amount from payment provider
+  paid_amount              Decimal?
+  // paid currency from payment provider
+  paid_currency            String?
+  // e.g. stripe, paypal, razorpay
+  payment_provider         String?
+  // e.g. stripe payment reference id
+  payment_reference_number String?
+
+  payment_provider_charge_type String?  @default("percentage") // e.g. fixed, percentage
+  payment_provider_charge      Decimal? // e.g. stripe payment provider charge
+
+  // Relations
+  user                 User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  subscription_type    SubscriptionType     @relation(fields: [subscription_type_id], references: [id])
+  payment_transactions PaymentTransaction[]
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  categories         Category[]
-  question_types     QuestionType[]
-  difficulties       Difficulty[]
-  questions          Question[]
-  games              Game[] // Games that use this language
-  subscription_types SubscriptionType[]
-
-  @@map("languages") // Table name in database
-}
-
-model Difficulty {
-  id          String   @id @default(cuid()) // Unique identifier for difficulty level
-  name        String // e.g., Easy, Medium, Extreme
-  language_id String // Foreign key to Language model
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  questions Question[] // Related questions of this difficulty level
-
-  @@map("difficulties") // Table name in database
-}
-
-model QuestionType {
-  id          String   @id @default(cuid()) // Unique identifier for the question type
-  name        String // Name of the question type (e.g., Multiple Choice, True/False)
-  language_id String // Foreign key to the Language model
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  questions Question[] // Related questions of this type
-
-  @@map("question_types") // Table name in the database
-}
-
-model Category {
-  id          String   @id @default(cuid()) // Unique identifier for category
-  name        String // e.g., Science, History
-  language_id String // Foreign key to Language model
-  image       String? // Image for the category (optional)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  questions    Question[] // Related questions
-  leaderboards Leaderboard[]
-
-  @@map("categories") // Table name in database
-}
-
-model Question {
-  id               String   @id @default(cuid()) // Unique identifier for the question
-  text             String // The question text
-  category_id      String // Foreign key to Category model
-  language_id      String // Foreign key to Language model
-  difficulty_id    String // Foreign key to Difficulty model
-  question_type_id String // Foreign key to QuestionType model
-  file_url         String? // Optional file upload (e.g., image, document)
-  time             Int // Time limit for answering the question (in seconds)
-  free_bundle      Boolean // Whether this question is part of a free bundle (Yes/No)
-  firebase         Boolean // Whether this question is stored in Firebase (Yes/No)
-  points           Int // Points awarded based on difficulty of the question
-  created_at       DateTime @default(now()) // Automatically sets the creation date
-  updated_at       DateTime @updatedAt // Automatically updates the last modified date
-
-  category       Category       @relation(fields: [category_id], references: [id], onDelete: Cascade) // Relation with Category model
-  language       Language       @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
-  difficulty     Difficulty     @relation(fields: [difficulty_id], references: [id], onDelete: Cascade) // Relation with Difficulty model
-  question_type  QuestionType   @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
-  answers        Answer[] // Related answers to the question
-  player_answers PlayerAnswer[] // Game answers for this question
-
-  @@map("questions") // Table name in database
-}
-
-model Answer {
-  id          String  @id @default(cuid()) // Unique identifier for each answer
-  question_id String // Foreign key to Question model
-  text        String? // The answer text
-  file_url    String? // The answer file url
-  is_correct  Boolean @default(false) // Whether the answer is correct or not
-
-  question       Question       @relation(fields: [question_id], references: [id], onDelete: Cascade) // Relation with Question model
-  player_answers PlayerAnswer[] // Related game answers
-
-  @@map("answers") // Table name in database
+  @@map("subscriptions") // Table name in database
 }
 
 // ---------Start Game schema---------
@@ -570,8 +511,10 @@ model Game {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  mode   GameMode @default(QUICK_GAME) // Game mode: Quick Game or Grid Style
-  status String?  @default("active")
+  mode               GameMode @default(QUICK_GAME) // Game mode: Quick Game or Grid Style
+  status             String?  @default("active")
+  is_free_quick_game Boolean  @default(true)
+  is_free_grid_style Boolean  @default(true)
 
   // For Grid Style - all categories are available, no specific category selected
   language_id String // Foreign key to Language model (game language)
@@ -673,4 +616,101 @@ model Leaderboard {
   category Category? @relation(fields: [category_id], references: [id], onDelete: Cascade)
 
   @@map("leaderboards")
+}
+
+model Language {
+  id         String   @id @default(cuid()) // Unique identifier for the language
+  name       String // e.g., English, Arabic
+  code       String // e.g., en, ar
+  file_url   String? // The language JSON file url
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  categories         Category[]
+  question_types     QuestionType[]
+  difficulties       Difficulty[]
+  questions          Question[]
+  games              Game[] // Games that use this language
+  subscription_types SubscriptionType[]
+
+  @@map("languages") // Table name in database
+}
+
+model Difficulty {
+  id          String   @id @default(cuid()) // Unique identifier for difficulty level
+  name        String // e.g., Easy, Medium, Extreme
+  language_id String // Foreign key to Language model
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  questions Question[] // Related questions of this difficulty level
+
+  @@map("difficulties") // Table name in database
+}
+
+model QuestionType {
+  id          String   @id @default(cuid()) // Unique identifier for the question type
+  name        String // Name of the question type (e.g., Multiple Choice, True/False)
+  language_id String // Foreign key to the Language model
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  questions Question[] // Related questions of this type
+
+  @@map("question_types") // Table name in the database
+}
+
+model Category {
+  id          String   @id @default(cuid()) // Unique identifier for category
+  name        String // e.g., Science, History
+  language_id String // Foreign key to Language model
+  image       String? // Image for the category (optional)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  questions    Question[] // Related questions
+  leaderboards Leaderboard[]
+
+  @@map("categories") // Table name in database
+}
+
+model Question {
+  id               String   @id @default(cuid()) // Unique identifier for the question
+  text             String // The question text
+  category_id      String // Foreign key to Category model
+  language_id      String // Foreign key to Language model
+  difficulty_id    String // Foreign key to Difficulty model
+  question_type_id String // Foreign key to QuestionType model
+  file_url         String? // Optional file upload (e.g., image, document)
+  time             Int // Time limit for answering the question (in seconds)
+  free_bundle      Boolean // Whether this question is part of a free bundle (Yes/No)
+  firebase         Boolean // Whether this question is stored in Firebase (Yes/No)
+  points           Int // Points awarded based on difficulty of the question
+  created_at       DateTime @default(now()) // Automatically sets the creation date
+  updated_at       DateTime @updatedAt // Automatically updates the last modified date
+
+  category       Category       @relation(fields: [category_id], references: [id], onDelete: Cascade) // Relation with Category model
+  language       Language       @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
+  difficulty     Difficulty     @relation(fields: [difficulty_id], references: [id], onDelete: Cascade) // Relation with Difficulty model
+  question_type  QuestionType   @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
+  answers        Answer[] // Related answers to the question
+  player_answers PlayerAnswer[] // Game answers for this question
+
+  @@map("questions") // Table name in database
+}
+
+model Answer {
+  id          String  @id @default(cuid()) // Unique identifier for each answer
+  question_id String // Foreign key to Question model
+  text        String? // The answer text
+  file_url    String? // The answer file url
+  is_correct  Boolean @default(false) // Whether the answer is correct or not
+
+  question       Question       @relation(fields: [question_id], references: [id], onDelete: Cascade) // Relation with Question model
+  player_answers PlayerAnswer[] // Related game answers
+
+  @@map("answers") // Table name in database
 }
