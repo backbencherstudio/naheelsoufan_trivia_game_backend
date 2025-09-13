@@ -429,7 +429,7 @@ export class GamePlayerService {
         try {
             const gamePlayer = await this.prisma.gamePlayer.findFirst({
                 where: {
-                    // game_id: gameId,
+                    game_id: gameId,
                     user_id: answerDto.user_id,
                 }
             });

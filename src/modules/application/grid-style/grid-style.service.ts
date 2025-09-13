@@ -1,4 +1,4 @@
-import { HttpException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { GetCategoryDto } from './dto/get-question.dto';
 import { AnswerQuestionDto } from './dto/answer-question.dto';
@@ -22,7 +22,10 @@ export class GridStyleService {
                 },
             });
             const players = await this.prisma.gamePlayer.findMany({
-                where: { game_id: game_id }
+                where: { game_id: game_id },
+                include: {
+                    player_answers: true
+                }
             })
 
             const foundIds = new Set(categories.map(c => c.id));
@@ -110,17 +113,62 @@ export class GridStyleService {
 
     async answerQuestion(payload: AnswerQuestionDto) {
         try {
-            const players = await this.prisma.gamePlayer.findMany({
-                where: { game_id: payload.game_id }
-            })
+            const { answer_id, question_id, user_id } = payload
+            const question = await this.prisma.question.findUnique({
+                where: { id: question_id },
+                include: { answers: true }
+            });
+
+            if (!question) {
+                throw new NotFoundException('Question not found');
+            }
+
+            const selectedAnswer = question.answers.find(a => a.id === answer_id);
+            if (!selectedAnswer) {
+                throw new BadRequestException('Invalid answer selected');
+            }
+
+            const existingAnswer = await this.prisma.playerAnswer.findFirst({
+                where: {
+                    game_player_id: user_id,
+                    question_id: question_id
+                }
+            });
+
+            if (existingAnswer) {
+                throw new BadRequestException('Question already answered');
+            }
+
+            await this.prisma.playerAnswer.create({
+                data: {
+                    game_player_id: user_id,
+                    question_id: question_id,
+                    answer_id: answer_id,
+                    isCorrect: selectedAnswer.is_correct,
+                }
+            });
 
 
+            const pointsEarned = selectedAnswer.is_correct ? question.points : 0;
+            const updatedPlayer = await this.prisma.gamePlayer.update({
+                where: { id: user_id },
+                data: {
+                    score: { increment: pointsEarned },
+                    ...(selectedAnswer.is_correct
+                        ? { correct_answers: { increment: 1 } }
+                        : { wrong_answers: { increment: 1 } }
+                    )
+                }
+            });
 
             return {
                 success: true,
                 message: 'Answer a question successfully.',
                 data: {
-                    players
+                    is_correct: selectedAnswer.is_correct,
+                    points_earned: pointsEarned,
+                    current_score: updatedPlayer.score,
+                    correct_answer: selectedAnswer.is_correct ? null : question.answers.find(a => a.is_correct)
                 },
             };
         } catch (error) {

@@ -6,13 +6,13 @@ import {
 export class AnswerQuestionDto {
     @IsString()
     @IsNotEmpty()
-    game_id: string
-
-    @IsString()
-    @IsNotEmpty()
     question_id: string
 
     @IsString()
     @IsNotEmpty()
-    team_id: string
+    answer_id: string
+
+    @IsString()
+    @IsNotEmpty()
+    user_id: string
 }
