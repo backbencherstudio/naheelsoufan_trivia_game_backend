@@ -9,20 +9,34 @@ export class TransactionRepository {
    */
   static async createTransaction({
     booking_id,
+    user_id,
+    subscription_id,
     amount,
     currency,
     reference_number,
     status = 'pending',
+    type = 'order',
+    provider,
   }: {
-    booking_id: string;
+    booking_id?: string;
+    user_id?: string;
+    subscription_id?: string;
     amount?: number;
     currency?: string;
     reference_number?: string;
     status?: string;
+    type?: string;
+    provider?: string;
   }) {
     const data = {};
     if (booking_id) {
       data['booking_id'] = booking_id;
+    }
+    if (user_id) {
+      data['user_id'] = user_id;
+    }
+    if (subscription_id) {
+      data['subscription_id'] = subscription_id;
     }
     if (amount) {
       data['amount'] = Number(amount);
@@ -36,9 +50,50 @@ export class TransactionRepository {
     if (status) {
       data['status'] = status;
     }
+    if (type) {
+      data['type'] = type;
+    }
+    if (provider) {
+      data['provider'] = provider;
+    }
     return await prisma.paymentTransaction.create({
       data: {
         ...data,
+      },
+    });
+  }
+
+  /**
+   * Create subscription transaction
+   * @returns
+   */
+  static async createSubscriptionTransaction({
+    subscription_id,
+    user_id,
+    amount,
+    currency = 'usd',
+    reference_number,
+    status = 'pending',
+    provider = 'stripe',
+  }: {
+    subscription_id: string;
+    user_id: string;
+    amount: number;
+    currency?: string;
+    reference_number?: string;
+    status?: string;
+    provider?: string;
+  }) {
+    return await prisma.paymentTransaction.create({
+      data: {
+        user_id,
+        subscription_id,
+        amount: Number(amount),
+        currency,
+        reference_number,
+        status,
+        type: 'subscription',
+        provider,
       },
     });
   }

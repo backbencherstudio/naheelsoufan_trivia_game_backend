@@ -538,7 +538,7 @@ model Difficulty {
   id          String   @id @default(cuid()) // Unique identifier for difficulty level
   name        String // e.g., Easy, Medium, Extreme
   language_id String // Foreign key to Language model
-  points      Int // Points awarded based on difficulty of the question
+  points      Int? // Points awarded based on difficulty of the question
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
