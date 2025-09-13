@@ -10,9 +10,9 @@ export class GridStyleController {
 
     @UseGuards(JwtAuthGuard)
     @ApiOperation({ summary: 'Get questions.' })
-    @Get('get-questions/:gameId')
-    async getQuestion(@Param('gameId') gameId: string,
+    @Get('select-difficulty')
+    async getQuestion(
         @Query() questionsDto: QuestionsDto,) {
-        return this.service.getQuestion(gameId, questionsDto.categories)
+        return this.service.getDifficultyLevel(questionsDto.categories)
     }
 }

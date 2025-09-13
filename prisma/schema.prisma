@@ -392,6 +392,7 @@ model Difficulty {
   id          String     @id @default(cuid())
   name        String
   language_id String
+  points      Int?
   created_at  DateTime   @default(now())
   updated_at  DateTime   @updatedAt
   language    Language   @relation(fields: [language_id], references: [id], onDelete: Cascade)
