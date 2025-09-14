@@ -51,14 +51,21 @@ export class CategoryService {
     }
   }
 
-  // Get all categories with optional search
-  async findAll(searchQuery: string | null, page: number, limit: number) {
+  // Get all categories with optional search and language filter
+  async findAll(searchQuery: string | null, page: number, limit: number, languageId?: string) {
     try {
-      const whereClause = {};
+      const whereClause: any = {};
+
+      // Search filter
       if (searchQuery) {
         whereClause['OR'] = [
           { name: { contains: searchQuery, mode: 'insensitive' } },
         ];
+      }
+
+      // Language filter
+      if (languageId) {
+        whereClause['language_id'] = languageId;
       }
 
       const total = await this.prisma.category.count({
@@ -67,6 +74,11 @@ export class CategoryService {
 
       const categories = await this.prisma.category.findMany({
         where: whereClause,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: {
+          created_at: 'desc',
+        },
         select: {
           id: true,
           name: true,

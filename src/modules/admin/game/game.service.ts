@@ -75,6 +75,17 @@ export class GameService {
               email: true,
             },
           },
+          game_players: {
+            select: {
+              id: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               game_players: true,

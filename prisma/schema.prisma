@@ -428,11 +428,8 @@ model Game {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  mode               GameMode @default(QUICK_GAME) // Game mode: Quick Game or Grid Style
-  status             String?  @default("active")
-  is_free_quick_game Boolean  @default(true)
-  is_free_grid_style Boolean  @default(true)
-
+  mode        GameMode @default(QUICK_GAME) // Game mode: Quick Game or Grid Style
+  status      String?  @default("active")
   // For Grid Style - all categories are available, no specific category selected
   language_id String // Foreign key to Language model (game language)
   language    Language @relation(fields: [language_id], references: [id])

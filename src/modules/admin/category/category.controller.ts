@@ -40,14 +40,15 @@ export class CategoryController {
     return await this.categoryService.create(createCategoryDto, file)
   }
 
-  @ApiOperation({ summary: 'Read all categories' })
+  @ApiOperation({ summary: 'Read all categories with optional search and language filter' })
   @Get()
-  async findAll(@Query() query: { q?: string, page?: number, limit?: number }) {
+  async findAll(@Query() query: { q?: string, page?: number, limit?: number, language_id?: string }) {
     try {
       const searchQuery = query.q;  // Optional search query
       const page = query.page ? Number(query.page) : 1;
       const limit = query.limit ? Number(query.limit) : 10;
-      const categories = await this.categoryService.findAll(searchQuery, page, limit);  // Fetch all categories
+      const languageId = query.language_id;  // Optional language filter
+      const categories = await this.categoryService.findAll(searchQuery, page, limit, languageId);  // Fetch all categories
       return categories;
     } catch (error) {
       return {

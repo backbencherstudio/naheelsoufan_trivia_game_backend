@@ -7,9 +7,71 @@ import { UpdateGameDto } from './dto/update-game.dto';
 export class GameService {
   constructor(private readonly prisma: PrismaService) { }
 
-  // Create a new game
+  // Create a new game with subscription validation
   async create(createGameDto: CreateGameDto, user_id: string) {
     try {
+      // Check how many games the user has created for this specific game type
+      const gamesOfThisType = await this.prisma.game.count({
+        where: {
+          host_id: user_id,
+          mode: createGameDto.mode
+        },
+      });
+
+      // Get total games created (for tracking purposes)
+      const totalGamesCount = await this.prisma.game.count({
+        where: {
+          host_id: user_id,
+          mode: {
+            in: ['QUICK_GAME', 'GRID_STYLE']
+          }
+        },
+      });
+
+      // If this is not the first game of this type, check for subscription
+      if (gamesOfThisType > 0) {
+        // Check if user has an active subscription
+        const activeSubscription = await this.prisma.subscription.findFirst({
+          where: {
+            user_id,
+            status: 'active',
+          },
+          include: {
+            subscription_type: true,
+          },
+        });
+
+        if (!activeSubscription) {
+          const gameTypesCreated = await this.getGameTypesCreated(user_id);
+          return {
+            success: false,
+            message: `You have already used your free ${createGameDto.mode.replace('_', ' ')} game. Please purchase a subscription to create more ${createGameDto.mode.replace('_', ' ')} games.`,
+            data: {
+              requires_subscription: true,
+              games_of_this_type: gamesOfThisType,
+              total_games_created: totalGamesCount,
+              game_type: createGameDto.mode,
+              game_types_created: gameTypesCreated,
+            },
+          };
+        }
+
+        // Check if user has remaining games in their subscription
+        const gamesRemaining = activeSubscription.subscription_type.games - activeSubscription.games_played_count;
+        if (activeSubscription.subscription_type.games !== -1 && gamesRemaining <= 0) {
+          return {
+            success: false,
+            message: 'No games remaining in your subscription. Please upgrade or purchase a new subscription.',
+            data: {
+              subscription_exhausted: true,
+              games_limit: activeSubscription.subscription_type.games,
+              games_played: activeSubscription.games_played_count,
+            },
+          };
+        }
+      }
+
+      // Create the game
       const game = await this.prisma.game.create({
         data: {
           ...createGameDto,
@@ -31,15 +93,203 @@ export class GameService {
         },
       });
 
+      // If user has a subscription and this is not their first game of this type, increment the games played count
+      if (gamesOfThisType > 0) {
+        const activeSubscription = await this.prisma.subscription.findFirst({
+          where: {
+            user_id,
+            status: 'active',
+          },
+        });
+
+        if (activeSubscription) {
+          await this.prisma.subscription.update({
+            where: { id: activeSubscription.id },
+            data: {
+              games_played_count: {
+                increment: 1,
+              },
+            },
+          });
+        }
+      }
+
+      const gameTypesCreated = await this.getGameTypesCreated(user_id);
+      const isFirstGameOfType = gamesOfThisType === 0;
+
       return {
         success: true,
-        message: 'Game created successfully',
-        data: game,
+        message: isFirstGameOfType
+          ? `Congratulations! Your first ${createGameDto.mode.replace('_', ' ')} game created successfully (FREE). You can also create one free game of the other type.`
+          : `${createGameDto.mode.replace('_', ' ')} game created successfully using your subscription.`,
+        data: {
+          ...game,
+          is_first_game_of_type: isFirstGameOfType,
+          games_of_this_type: gamesOfThisType + 1,
+          total_games_created: totalGamesCount + 1,
+          game_types_created: {
+            ...gameTypesCreated,
+            [createGameDto.mode]: (gameTypesCreated[createGameDto.mode] || 0) + 1,
+            total: gameTypesCreated.total + 1
+          },
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: `Error creating game: ${error.message}`,
+      };
+    }
+  }
+
+  // Helper method to get game types created by user
+  async getGameTypesCreated(user_id: string) {
+    const games = await this.prisma.game.findMany({
+      where: {
+        host_id: user_id,
+        mode: {
+          in: ['QUICK_GAME', 'GRID_STYLE']
+        }
+      },
+      select: {
+        mode: true,
+        created_at: true,
+      },
+      orderBy: {
+        created_at: 'asc',
+      },
+    });
+
+    const gameTypes = {
+      QUICK_GAME: games.filter(g => g.mode === 'QUICK_GAME').length,
+      GRID_STYLE: games.filter(g => g.mode === 'GRID_STYLE').length,
+      total: games.length,
+      types_created: [...new Set(games.map(g => g.mode))],
+    };
+
+    return gameTypes;
+  }
+
+  // Check user's game creation eligibility
+  async checkGameCreationEligibility(user_id: string, game_mode?: string) {
+    try {
+      const gameTypesCreated = await this.getGameTypesCreated(user_id);
+
+      // If checking for a specific game mode
+      if (game_mode) {
+        const gamesOfThisType = gameTypesCreated[game_mode] || 0;
+
+        // If no games of this type created yet, it's free
+        if (gamesOfThisType === 0) {
+          return {
+            success: true,
+            message: `You can create your first ${game_mode.replace('_', ' ')} game for free!`,
+            data: {
+              can_create_game: true,
+              is_first_game_of_type: true,
+              game_mode: game_mode,
+              games_of_this_type: gamesOfThisType,
+              requires_subscription: false,
+              game_types_created: gameTypesCreated,
+            },
+          };
+        }
+      }
+
+      // Check available free games
+      const quickGamesCreated = gameTypesCreated.QUICK_GAME || 0;
+      const gridGamesCreated = gameTypesCreated.GRID_STYLE || 0;
+      const availableFreeGames = [];
+
+      if (quickGamesCreated === 0) availableFreeGames.push('QUICK_GAME');
+      if (gridGamesCreated === 0) availableFreeGames.push('GRID_STYLE');
+
+      // If user still has free games available
+      if (availableFreeGames.length > 0) {
+        return {
+          success: true,
+          message: `You can create ${availableFreeGames.length === 2 ? 'both' : 'one more'} free game${availableFreeGames.length === 2 ? 's' : ''}! Available: ${availableFreeGames.map(g => g.replace('_', ' ')).join(' and ')}.`,
+          data: {
+            can_create_game: true,
+            has_free_games_available: true,
+            available_free_games: availableFreeGames,
+            requires_subscription: false,
+            game_types_created: gameTypesCreated,
+          },
+        };
+      }
+
+      // Check for active subscription
+      const activeSubscription = await this.prisma.subscription.findFirst({
+        where: {
+          user_id,
+          status: 'active',
+        },
+        include: {
+          subscription_type: true,
+        },
+      });
+
+      if (!activeSubscription) {
+        return {
+          success: true,
+          message: 'You have used your free games for both game types. A subscription is required to create more games.',
+          data: {
+            can_create_game: false,
+            has_free_games_available: false,
+            available_free_games: [],
+            requires_subscription: true,
+            subscription_status: 'none',
+            game_types_created: gameTypesCreated,
+          },
+        };
+      }
+
+      // Check subscription limits
+      const gamesRemaining = activeSubscription.subscription_type.games - activeSubscription.games_played_count;
+      const hasUnlimitedGames = activeSubscription.subscription_type.games === -1;
+
+      if (!hasUnlimitedGames && gamesRemaining <= 0) {
+        return {
+          success: true,
+          message: 'Your subscription has no remaining games. Please upgrade or renew your subscription.',
+          data: {
+            can_create_game: false,
+            has_free_games_available: false,
+            available_free_games: [],
+            requires_subscription: false,
+            subscription_status: 'exhausted',
+            subscription_type: activeSubscription.subscription_type.type,
+            games_limit: activeSubscription.subscription_type.games,
+            games_played: activeSubscription.games_played_count,
+            games_remaining: 0,
+            game_types_created: gameTypesCreated,
+          },
+        };
+      }
+
+      return {
+        success: true,
+        message: hasUnlimitedGames
+          ? 'You can create unlimited games with your subscription!'
+          : `You can create ${gamesRemaining} more games with your subscription.`,
+        data: {
+          can_create_game: true,
+          has_free_games_available: false,
+          available_free_games: [],
+          requires_subscription: false,
+          subscription_status: 'active',
+          subscription_type: activeSubscription.subscription_type.type,
+          games_limit: activeSubscription.subscription_type.games,
+          games_played: activeSubscription.games_played_count,
+          games_remaining: hasUnlimitedGames ? -1 : gamesRemaining,
+          game_types_created: gameTypesCreated,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error checking game creation eligibility: ${error.message}`,
       };
     }
   }

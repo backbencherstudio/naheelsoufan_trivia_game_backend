@@ -13,6 +13,8 @@ import { QuestionModule } from './question/question.module';
 import { SubscriptionTypeModule } from './subscription-type/subscription-type.module';
 import { GameModule } from './game/game.module';
 import { GamePlayerModule } from './game-player/game-player.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 
 @Module({
@@ -31,6 +33,8 @@ import { GamePlayerModule } from './game-player/game-player.module';
     SubscriptionTypeModule,
     GameModule,
     GamePlayerModule,
+    SubscriptionModule,
+    DashboardModule,
   ],
 })
 export class AdminModule { }
