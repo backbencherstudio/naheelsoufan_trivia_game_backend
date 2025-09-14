@@ -26,6 +26,21 @@ import { Role } from '../../../common/guard/role/role.enum';
 export class GameController {
   constructor(private readonly gameService: GameService) { }
 
+  @ApiOperation({ summary: 'Check if user can create a game' })
+  @Get('eligibility')
+  async checkGameCreationEligibility(@Req() req: any, @Query('game_mode') game_mode?: string) {
+    try {
+      const user_id = req.user.userId;
+      const eligibility = await this.gameService.checkGameCreationEligibility(user_id, game_mode);
+      return eligibility;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
   @ApiOperation({ summary: 'Create a new game' })
   @Post()
   async create(

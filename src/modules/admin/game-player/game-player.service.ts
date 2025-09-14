@@ -58,7 +58,6 @@ export class GamePlayerService {
                             id: true,
                             name: true,
                             email: true,
-                            avatar: true,
                         }
                     },
                     game: {

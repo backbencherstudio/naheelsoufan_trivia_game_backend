@@ -15,9 +15,15 @@ export class QuestionTypeService {
         select: {
           id: true,
           name: true,
-          language_id: true,
           created_at: true,
           updated_at: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
         },
       });
 
@@ -35,14 +41,19 @@ export class QuestionTypeService {
   }
 
   // Get all question types with pagination and search
-  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string) {
+  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string, languageId?: string) {
     try {
       const skip = (page - 1) * limit;
 
       // Construct the search filter based on query
-      const whereClause = {};
+      const whereClause: any = {};
       if (searchQuery) {
         whereClause['name'] = { contains: searchQuery, mode: 'insensitive' };
+      }
+
+      // Language filter
+      if (languageId) {
+        whereClause['language_id'] = languageId;
       }
 
       // Count total records for pagination

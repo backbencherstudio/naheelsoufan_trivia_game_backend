@@ -45,7 +45,7 @@ export class DifficultyController {
     }
   }
 
-  @ApiOperation({ summary: 'Read all difficulty levels' })
+  @ApiOperation({ summary: 'Read all difficulty levels with optional search, sorting, and language filter' })
   @Get()
   async findAll(@Query() query: {
     q?: string;
@@ -53,6 +53,7 @@ export class DifficultyController {
     limit?: string;
     sort?: string;
     order?: string;
+    language_id?: string;
   }) {
     try {
       const searchQuery = query.q || null;  // Optional search query
@@ -60,8 +61,9 @@ export class DifficultyController {
       const limit = parseInt(query.limit) || 10;  // Default to 10 items per page
       const sort = query.sort || 'created_at';  // Default sort by created_at
       const order = query.order || 'desc';  // Default order descending
+      const languageId = query.language_id;  // Optional language filter
 
-      const difficulties = await this.difficultyService.findAll(searchQuery, page, limit, sort, order);
+      const difficulties = await this.difficultyService.findAll(searchQuery, page, limit, sort, order, languageId);
       return difficulties;
     } catch (error) {
       return {
