@@ -29,10 +29,15 @@ export class CategoryService {
         select: {
           id: true,
           name: true,
-          language_id: true,
           image: true,
           created_at: true,
           updated_at: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       });
 

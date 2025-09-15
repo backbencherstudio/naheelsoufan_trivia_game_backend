@@ -8,10 +8,6 @@ export class CreateCategoryDto {
     @IsString()
     language_id: string;  // The ID of the language the category belongs to
 
-    @IsString()
-    @IsNotEmpty()
-    game_id: string;  // The ID of the game the category belongs to
-
     @IsOptional()
     @IsString()
     image?: string;  // Optional image URL for the category

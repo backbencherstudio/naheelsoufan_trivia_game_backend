@@ -42,12 +42,14 @@ export class CreateQuestionDto {
     @Transform(({ value }) => Number(value))
     time: number;  // Time limit for answering the question (in seconds)
 
+    @IsOptional()
     @IsBoolean()
-    @Transform(({ value }) => value === 'true')
+    @Transform(({ value }) => value === 'true' ? true : false)
     free_bundle: boolean;  // Whether this question is part of a free bundle (Yes/No)
 
+    @IsOptional()
     @IsBoolean()
-    @Transform(({ value }) => value === 'true')
+    @Transform(({ value }) => value === 'true' ? true : false)
     firebase: boolean;  // Whether this question is stored in Firebase (Yes/No)
 
     @IsInt()

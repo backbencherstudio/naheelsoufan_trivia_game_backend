@@ -51,6 +51,7 @@ export class SubscriptionTypeController {
     limit?: string;
     sort?: string;
     order?: string;
+    language_id?: string;
   }) {
     try {
       const searchQuery = query.q || null; // Optional search query
@@ -58,8 +59,9 @@ export class SubscriptionTypeController {
       const limit = parseInt(query.limit) || 10; // Default to 10 items per page
       const sort = query.sort || 'created_at'; // Default sort by created_at
       const order = query.order || 'desc'; // Default order descending
-
-      const subscriptionTypes = await this.subscriptionTypeService.findAll(searchQuery, page, limit, sort, order); // Fetch subscription types with pagination
+      const languageId = query.language_id; // Optional language filter
+      
+      const subscriptionTypes = await this.subscriptionTypeService.findAll(searchQuery, page, limit, sort, order, languageId); // Fetch subscription types with pagination
       return subscriptionTypes;
     } catch (error) {
       return {

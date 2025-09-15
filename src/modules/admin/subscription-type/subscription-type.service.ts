@@ -50,7 +50,7 @@ export class SubscriptionTypeService {
   }
 
   // Get all subscription types with pagination and search
-  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string) {
+  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string, languageId?: string) {
     try {
       const skip = (page - 1) * limit;
 
@@ -61,6 +61,11 @@ export class SubscriptionTypeService {
           { type: { contains: searchQuery, mode: 'insensitive' } },
           { status: { contains: searchQuery, mode: 'insensitive' } },
         ];
+      }
+
+      // Language filter
+      if (languageId) {
+        whereClause['language_id'] = languageId;
       }
 
       // Count total records for pagination
