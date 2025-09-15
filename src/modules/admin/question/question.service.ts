@@ -13,13 +13,12 @@ export class QuestionService {
   async create(createQuestionDto: CreateQuestionDto, questionFile: Express.Multer.File, answerFiles: Express.Multer.File[]) {
     try {
       const { answers, ...questionData } = createQuestionDto;
-
-
+      
       // Handle file upload for the question
       if (questionFile) {
         const questionFileName = StringHelper.generateRandomFileName(questionFile.originalname);
         await SojebStorage.put(appConfig().storageUrl.question + questionFileName, questionFile.buffer);
-        createQuestionDto.file_url = questionFileName;  // Set file URL for the question
+        questionData.file_url = questionFileName;  // Set file URL for the question
       }
 
       // Create the question first
@@ -30,8 +29,18 @@ export class QuestionService {
         select: {
           id: true,
           text: true,
+          file_url: true,
+          time: true,
+          free_bundle: true,
+          firebase: true,
+          points: true,
           created_at: true,
           updated_at: true,
+          category: { select: { id: true, name: true } },
+          language: { select: { id: true, name: true } },
+          difficulty: { select: { id: true, name: true } },
+          question_type: { select: { id: true, name: true } },
+          answers: { select: { id: true, text: true, is_correct: true, file_url: true } },
         },
       });
 

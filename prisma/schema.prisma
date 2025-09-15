@@ -582,8 +582,8 @@ model Question {
   question_type_id String // Foreign key to QuestionType model
   file_url         String? // Optional file upload (e.g., image, document)
   time             Int // Time limit for answering the question (in seconds)
-  free_bundle      Boolean // Whether this question is part of a free bundle (Yes/No)
-  firebase         Boolean // Whether this question is stored in Firebase (Yes/No)
+  free_bundle      Boolean? // Whether this question is part of a free bundle (Yes/No)
+  firebase         Boolean? // Whether this question is stored in Firebase (Yes/No)
   points           Int // Points awarded based on difficulty of the question
   created_at       DateTime @default(now()) // Automatically sets the creation date
   updated_at       DateTime @updatedAt // Automatically updates the last modified date

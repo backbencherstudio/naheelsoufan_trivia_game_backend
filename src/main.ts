@@ -25,11 +25,7 @@ async function bootstrap() {
 
   // Configure CORS with specific settings
   const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:5173', // Vite default port
-    'https://nirob.signalsmind.com',
-    'https://www.nirob.signalsmind.com',
+    '*',
   ];
 
   // Add client app URL from environment if available
