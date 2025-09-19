@@ -320,12 +320,12 @@ export class UserRepository {
           value: String(email),
         });
 
-        if (userEmailExist) {
-          return {
-            success: false,
-            message: 'Email already exist',
-          };
-        }
+        // if (userEmailExist) {
+        //   return {
+        //     success: false,
+        //     message: 'Email already exist',
+        //   };
+        // }
         data['email'] = email;
       }
       if (password) {

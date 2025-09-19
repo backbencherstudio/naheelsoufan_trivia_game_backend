@@ -449,6 +449,7 @@ model GamePlayer {
   id              String         @id @default(cuid())
   created_at      DateTime       @default(now())
   updated_at      DateTime       @updatedAt
+  player_name     String?
   game_id         String
   room_id         String?
   score           Int            @default(0)

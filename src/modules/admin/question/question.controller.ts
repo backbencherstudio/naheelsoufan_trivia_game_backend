@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
 import { Roles } from '../../../common/guard/role/roles.decorator';
 import { Role } from '../../../common/guard/role/role.enum';
+import { UpdateQuestionDto } from './dto/update-question.dto';
 
 @ApiTags('Questions')
 @Controller('admin/questions')
@@ -158,7 +159,7 @@ export class QuestionController {
   )
   async update(
     @Param('id') id: string,
-    @Body() updateQuestionDto: CreateQuestionDto,
+    @Body() updateQuestionDto: UpdateQuestionDto,
     @UploadedFiles() files: { questionFile?: Express.Multer.File[]; answerFiles?: Express.Multer.File[] }
   ) {
     const questionFile = files.questionFile ? files.questionFile[0] : null;

@@ -42,8 +42,7 @@ export class GameService {
     try {
       const whereClause = {};
       if (searchQuery) {
-        whereClause['OR'] = [
-          { mode: { contains: searchQuery, mode: 'insensitive' } },
+        const searchConditions: any[] = [
           { status: { contains: searchQuery, mode: 'insensitive' } },
           {
             language: {
@@ -51,6 +50,18 @@ export class GameService {
             }
           },
         ];
+
+        // Check if searchQuery matches any GameMode enum values (case-insensitive)
+        const upperSearchQuery = searchQuery.toUpperCase();
+        if (upperSearchQuery === 'QUICK_GAME' || upperSearchQuery === 'GRID_STYLE') {
+          searchConditions.push({ mode: { equals: upperSearchQuery } });
+        } else if (searchQuery.toLowerCase().includes('quick') || searchQuery.toLowerCase().includes('game')) {
+          searchConditions.push({ mode: { equals: 'QUICK_GAME' } });
+        } else if (searchQuery.toLowerCase().includes('grid') || searchQuery.toLowerCase().includes('style')) {
+          searchConditions.push({ mode: { equals: 'GRID_STYLE' } });
+        }
+
+        whereClause['OR'] = searchConditions;
       }
 
       const games = await this.prisma.game.findMany({

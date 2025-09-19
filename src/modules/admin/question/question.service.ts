@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 import { StringHelper } from 'src/common/helper/string.helper';
 import appConfig from 'src/config/app.config';
+import { UpdateQuestionDto } from './dto/update-question.dto';
 
 @Injectable()
 export class QuestionService {
@@ -13,7 +15,7 @@ export class QuestionService {
   async create(createQuestionDto: CreateQuestionDto, questionFile: Express.Multer.File, answerFiles: Express.Multer.File[]) {
     try {
       const { answers, ...questionData } = createQuestionDto;
-      
+
       // Handle file upload for the question
       if (questionFile) {
         const questionFileName = StringHelper.generateRandomFileName(questionFile.originalname);
@@ -40,7 +42,6 @@ export class QuestionService {
           language: { select: { id: true, name: true } },
           difficulty: { select: { id: true, name: true } },
           question_type: { select: { id: true, name: true } },
-          answers: { select: { id: true, text: true, is_correct: true, file_url: true } },
         },
       });
 
@@ -68,7 +69,10 @@ export class QuestionService {
       return {
         success: true,
         message: 'Question and answers created successfully',
-        data: question,
+        data: {
+          question: question,
+          answers: answers || [],
+        },
       };
     } catch (error) {
       return {
@@ -103,14 +107,28 @@ export class QuestionService {
       // Count total records for pagination
       const total = await this.prisma.question.count({ where: searchFilter });
 
+      // Build orderBy supporting related fields (category, difficulty, language)
+      const direction: Prisma.SortOrder = (order || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+      const relationOrder: Prisma.QuestionOrderByWithRelationInput =
+        sort === 'category' ? { category: { name: direction } } :
+          sort === 'difficulty' ? { difficulty: { name: direction } } :
+            sort === 'language' ? { language: { name: direction } } : {};
+
+      const scalarSortField = ['text', 'created_at', 'updated_at', 'points', 'time'].includes(sort)
+        ? sort
+        : 'created_at';
+
+      const orderByClause: Prisma.QuestionOrderByWithRelationInput =
+        Object.keys(relationOrder).length > 0
+          ? relationOrder
+          : { [scalarSortField]: direction } as Prisma.QuestionOrderByWithRelationInput;
+
       // Query the questions with pagination, sorting, and filtering
       const questions = await this.prisma.question.findMany({
         where: searchFilter,
         skip: skip,
         take: limit,
-        orderBy: {
-          [sort]: order,  // Dynamically sort by the field and order provided
-        },
+        orderBy: orderByClause,
         select: {
           id: true,
           text: true,
@@ -255,16 +273,15 @@ export class QuestionService {
 
 
   // Update an existing question and its answers with file handling
-  async update(id: string, updateQuestionDto: CreateQuestionDto, questionFile: Express.Multer.File, answerFiles: Express.Multer.File[]) {
+  async update(id: string, updateQuestionDto: UpdateQuestionDto, questionFile: Express.Multer.File, answerFiles: Express.Multer.File[]) {
     try {
       const { answers, ...questionData } = updateQuestionDto;
-      let questionFileUrl = null;
 
       // Handle file upload for the question (if provided)
       if (questionFile) {
         const questionFileName = StringHelper.generateRandomFileName(questionFile.originalname);
         await SojebStorage.put(appConfig().storageUrl.question + questionFileName, questionFile.buffer);
-        questionFileUrl = questionFileName;
+        questionData.file_url = questionFileName;
       }
 
       // Update the question
@@ -272,7 +289,6 @@ export class QuestionService {
         where: { id },
         data: {
           ...questionData,
-          file_url: questionFileUrl,  // Update file URL if there's a new question file
         },
         select: {
           id: true,
@@ -489,7 +505,7 @@ export class QuestionService {
   // Export all questions
   async exportQuestions() {
     try {
-    
+
       const questions = await this.prisma.question.findMany({
         select: {
           id: true,

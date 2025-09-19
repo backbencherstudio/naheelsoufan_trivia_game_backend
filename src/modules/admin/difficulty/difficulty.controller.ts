@@ -28,7 +28,7 @@ export class DifficultyController {
   constructor(private readonly difficultyService: DifficultyService) { }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)  // Restrict to admin roles
+  @Roles(Role.ADMIN, Role.USER)  // Restrict to admin roles
   @ApiOperation({ summary: 'Create a new difficulty level' })
   @Post()
   async createDifficulty(
