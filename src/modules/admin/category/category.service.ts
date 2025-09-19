@@ -207,12 +207,21 @@ export class CategoryService {
         select: {
           id: true,
           name: true,
-          language_id: true,
           image: true,
           created_at: true,
           updated_at: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       });
+
+      if (updatedCategory && updatedCategory.image) {
+        updatedCategory['image_url'] = SojebStorage.url(appConfig().storageUrl.category + updatedCategory.image);
+      }
 
       return {
         success: true,

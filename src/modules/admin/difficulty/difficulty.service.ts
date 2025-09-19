@@ -15,6 +15,7 @@ export class DifficultyService {
         select: {
           id: true,
           name: true,
+          points: true,
           created_at: true,
           language: {
             select: {
@@ -68,6 +69,7 @@ export class DifficultyService {
         select: {
           id: true,
           name: true,
+          points: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -113,6 +115,7 @@ export class DifficultyService {
         select: {
           id: true,
           name: true,
+          points: true,
           created_at: true,
           updated_at: true,
           language: {

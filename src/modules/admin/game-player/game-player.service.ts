@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -13,7 +14,7 @@ export class GamePlayerService {
             // Construct the search filter based on query
             const whereClause = {};
             if (searchQuery) {
-                whereClause['OR'] = [
+                const conditions: any[] = [
                     {
                         user: {
                             name: { contains: searchQuery, mode: 'insensitive' }
@@ -24,25 +25,41 @@ export class GamePlayerService {
                             email: { contains: searchQuery, mode: 'insensitive' }
                         }
                     },
-                    {
-                        game: {
-                            mode: { contains: searchQuery, mode: 'insensitive' }
-                        }
-                    }
                 ];
+
+                const upper = searchQuery.toUpperCase();
+                if (upper === 'QUICK_GAME' || upper === 'GRID_STYLE') {
+                    conditions.push({ game: { mode: { equals: upper } } });
+                } else if (searchQuery.toLowerCase().includes('quick') || searchQuery.toLowerCase().includes('game')) {
+                    conditions.push({ game: { mode: { equals: 'QUICK_GAME' } } });
+                } else if (searchQuery.toLowerCase().includes('grid') || searchQuery.toLowerCase().includes('style')) {
+                    conditions.push({ game: { mode: { equals: 'GRID_STYLE' } } });
+                }
+
+                whereClause['OR'] = conditions;
             }
 
             // Count total records for pagination
             const total = await this.prisma.gamePlayer.count({ where: whereClause });
+
+            // Normalize sort and build orderBy (supports user.name and scalar fields like score)
+            const direction: Prisma.SortOrder = (order || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+            const scalarFields = ['score', 'correct_answers', 'wrong_answers', 'skipped_answers', 'player_order', 'final_rank', 'created_at', 'updated_at'];
+            let orderByClause: Prisma.GamePlayerOrderByWithRelationInput;
+            if (sort === 'name') {
+                orderByClause = { user: { name: direction } };
+            } else if (scalarFields.includes(sort)) {
+                orderByClause = { [sort]: direction } as Prisma.GamePlayerOrderByWithRelationInput;
+            } else {
+                orderByClause = { created_at: 'desc' } as Prisma.GamePlayerOrderByWithRelationInput;
+            }
 
             // Query the game players with pagination, sorting, and filtering
             const gamePlayers = await this.prisma.gamePlayer.findMany({
                 where: whereClause,
                 skip: skip,
                 take: limit,
-                orderBy: {
-                    [sort]: order, // Dynamically sort by the field and order provided
-                },
+                orderBy: orderByClause,
                 select: {
                     id: true,
                     score: true,
