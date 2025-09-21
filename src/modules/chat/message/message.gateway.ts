@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { OnModuleInit } from '@nestjs/common';
-import { MessageStatus } from '@prisma/client';
+// import { MessageStatus } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -24,10 +24,11 @@ import { ChatRepository } from '../../../common/repository/chat/chat.repository'
 })
 export class MessageGateway
   implements
-  OnGatewayInit,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnModuleInit {
+    OnGatewayInit,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnModuleInit
+{
   @WebSocketServer()
   server: Server;
 
@@ -48,7 +49,7 @@ export class MessageGateway
   public clients = new Map<string, string>(); // userId -> socketId
   private activeUsers = new Map<string, string>(); // username -> socketId
 
-  onModuleInit() { }
+  onModuleInit() {}
 
   afterInit(server: Server) {
     console.log('Websocket server started');
@@ -141,7 +142,7 @@ export class MessageGateway
   @SubscribeMessage('updateMessageStatus')
   async updateMessageStatus(
     client: Socket,
-    @MessageBody() body: { message_id: string; status: MessageStatus },
+    @MessageBody() body: { message_id: string; status: string },
   ) {
     await ChatRepository.updateMessageStatus(body.message_id, body.status);
     // notify the sender that the message has been sent

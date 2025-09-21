@@ -27,7 +27,7 @@ import { AuthGuard } from '@nestjs/passport';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService) {}
 
   @ApiOperation({ summary: 'Get user details' })
   @ApiBearerAuth()
@@ -93,7 +93,9 @@ export class AuthController {
         type: type,
       });
 
-      return response;
+      return {
+        response,
+      };
     } catch (error) {
       return {
         success: false,

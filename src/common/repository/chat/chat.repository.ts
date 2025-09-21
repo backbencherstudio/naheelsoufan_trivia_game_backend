@@ -1,4 +1,4 @@
-import { PrismaClient, MessageStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -7,7 +7,7 @@ export class ChatRepository {
    * Update message status
    * @returns
    */
-  static async updateMessageStatus(message_id: string, status: MessageStatus) {
+  static async updateMessageStatus(message_id: string, status: string) {
     // if message exist
     const message = await prisma.message.findFirst({
       where: {
