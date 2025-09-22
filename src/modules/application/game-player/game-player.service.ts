@@ -147,7 +147,7 @@ export class GamePlayerService {
     // Host joins their game and adds other players
     private async hostJoinWithPlayers(userId: string, joinGameDto: JoinGameDto, game: any) {
         // Remove duplicates from userIds array and ensure host is included
-        const uniqueUserIds = [...new Set([userId, ...joinGameDto.user_ids])];
+        const uniqueUserIds = Array.from(new Set([userId, ...joinGameDto.user_ids]));
 
         // Check if adding all users would exceed max_players
         const maxPlayers = 8;
