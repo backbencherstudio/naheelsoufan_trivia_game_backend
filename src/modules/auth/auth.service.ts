@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRedis } from '@nestjs-modules/ioredis';
 //internal imports
 import appConfig from '../../config/app.config';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -19,6 +20,7 @@ import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
 import { StringHelper } from '../../common/helper/string.helper';
 import { Message } from '../chat/message/entities/message.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import Redis from 'ioredis';
 
 @Injectable()
 export class AuthService {
@@ -26,6 +28,7 @@ export class AuthService {
     private jwtService: JwtService,
     private prisma: PrismaService,
     private mailService: MailService,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   async me(userId: string) {
@@ -248,6 +251,40 @@ export class AuthService {
     }
   }
 
+  // google log in using passport.js
+  async googleLogin({ email, userId }: { email: string; userId: string }) {
+    try {
+      const payload = { email: email, sub: userId };
+
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+      const user = await UserRepository.getUserDetails(userId);
+
+      await this.redis.set(
+        `refresh_token:${user.id}`,
+        refreshToken,
+        'EX',
+        60 * 60 * 24 * 7,
+      );
+
+      return {
+        message: 'Logged in successfully',
+        authorization: {
+          type: 'bearer',
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        },
+        type: user.type,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
   async register({
     name,
     first_name,
@@ -296,24 +333,19 @@ export class AuthService {
       // create stripe customer account
       // Creating Stripe customer account
       try {
-        console.log(email, name, user.data.id);
         const stripeCustomer = await StripePayment.createCustomer({
           user_id: user.data.id,
           email: email,
           name: name,
         });
 
-        console.log(stripeCustomer);
         if (stripeCustomer) {
           await this.prisma.user.update({
             where: { id: user.data.id },
             data: { billing_id: stripeCustomer.id },
           });
         }
-        console.log('Stripe customer created successfully');
-      } catch (error) {
-        console.error('Failed to create Stripe customer:');
-      }
+      } catch (error) {}
 
       // ----------------------------------------------------
       // // create otp code
@@ -357,9 +389,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        // message: error.message,
-        console2: console.log('===================================='),
-        console: console.log(error.message),
+        message: error.message,
       };
     }
   }

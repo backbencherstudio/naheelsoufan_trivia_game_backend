@@ -8,12 +8,13 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
@@ -23,6 +24,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -128,19 +130,30 @@ export class AuthController {
     }
   }
 
+  // Google login
   @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleLogin(): Promise<any> {
+  @UseGuards(GoogleAuthGuard)
+  async googleAuth(@Req() req) {
     return HttpStatus.OK;
   }
 
+  // Route that Google will redirect to after login
   @Get('google/redirect')
-  @UseGuards(AuthGuard('google'))
-  async googleLoginRedirect(@Req() req: Request): Promise<any> {
-    return {
-      statusCode: HttpStatus.OK,
-      data: req.user,
-    };
+  @UseGuards(GoogleAuthGuard)
+  async googleAuthRedirect(@Req() req, @Res() res: Response) {
+    const { user, loginResponse } = req.user;
+
+    // Now, return the JWT tokens and the user info
+    return res.json({
+      message: 'Logged in successfully via Google',
+      authorization: loginResponse.authorization,
+      user: {
+        email: user.email,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        avatar: user.picture,
+      },
+    });
   }
 
   // update user
