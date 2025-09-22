@@ -218,11 +218,11 @@ export class MessageService {
   }
 
   async updateMessageStatus(message_id: string, status: string) {
-    return await ChatRepository.updateMessageStatus(message_id, status);
+    return await ChatRepository.updateMessageStatus(message_id, status as any);
   }
 
   async readMessage(message_id: string) {
-    return await ChatRepository.updateMessageStatus(message_id, 'READ');
+    return await ChatRepository.updateMessageStatus(message_id, 'READ' as any);
   }
 
   async updateUserStatus(user_id: string, status: string) {
