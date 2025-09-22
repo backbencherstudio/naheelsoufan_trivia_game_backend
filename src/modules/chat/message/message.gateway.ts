@@ -144,7 +144,7 @@ export class MessageGateway
     client: Socket,
     @MessageBody() body: { message_id: string; status: string },
   ) {
-    await ChatRepository.updateMessageStatus(body.message_id, body.status);
+    await ChatRepository.updateMessageStatus(body.message_id, body.status as any);
     // notify the sender that the message has been sent
     this.server.emit('messageStatusUpdated', {
       message_id: body.message_id,
