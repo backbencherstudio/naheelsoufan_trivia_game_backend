@@ -2273,83 +2273,6 @@ export class GamePlayerService {
         }
     }
 
-    /**
-     * Get Quick Game status
-     */
-    async getQuickGameStatus(gameId: string) {
-        try {
-            const game = await this.prisma.game.findUnique({
-                where: { id: gameId },
-                include: {
-                    game_players: {
-                        include: { user: true },
-                        orderBy: { player_order: 'asc' }
-                    }
-                }
-            });
-
-            if (!game) {
-                throw new NotFoundException('Game not found');
-            }
-
-            const currentPlayer = game.game_players.find(
-                player => player.id === game.current_player_id
-            );
-
-            return {
-                success: true,
-                message: 'Quick Game status retrieved successfully',
-                data: {
-                    game: {
-                        id: game.id,
-                        mode: game.mode,
-                        status: game.status,
-                        phase: game.game_phase,
-                        current_turn: game.current_turn,
-                        total_questions: game.total_questions,
-                        current_question: game.current_question
-                    },
-                    players: game.game_players.map(player => ({
-                        id: player.id,
-                        name: player.player_name || player.user?.name || 'Unknown',
-                        score: player.score,
-                        correct_answers: player.correct_answers,
-                        wrong_answers: player.wrong_answers,
-                        player_order: player.player_order,
-                        is_current: player.id === game.current_player_id
-                    })),
-                    current_player: currentPlayer ? {
-                        id: currentPlayer.id,
-                        name: currentPlayer.player_name || currentPlayer.user?.name || 'Unknown',
-                        player_order: currentPlayer.player_order
-                    } : null
-                }
-            };
-
-        } catch (error) {
-            return {
-                success: false,
-                message: `Error getting Quick Game status: ${error.message}`,
-                data: null
-            };
-        }
-    }
-
-    /**
-     * End Quick Game and show results
-     */
-    async endQuickGame(gameId: string) {
-        try {
-            // Use existing endGame method
-            return await this.endGame('system', { game_id: gameId });
-        } catch (error) {
-            return {
-                success: false,
-                message: `Error ending Quick Game: ${error.message}`,
-                data: null
-            };
-        }
-    }
 
     /**
      * Add multiple players to Quick Game at once
@@ -3631,15 +3554,24 @@ export class GamePlayerService {
                 throw new BadRequestException('Invalid category or difficulty');
             }
 
-            // Get questions count for this category and difficulty
-            const questionsCount = await this.prisma.question.count({
+            // Get all questions for this category and difficulty
+            const allQuestions = await this.prisma.question.findMany({
                 where: {
                     category_id: categoryId,
                     difficulty_id: difficultyId
+                },
+                include: {
+                    answers: {
+                        select: {
+                            id: true,
+                            text: true,
+                            file_url: true
+                        }
+                    }
                 }
             });
 
-            if (questionsCount === 0) {
+            if (allQuestions.length === 0) {
                 throw new BadRequestException('No questions available for selected category and difficulty');
             }
 
@@ -3654,15 +3586,19 @@ export class GamePlayerService {
                 }
             });
 
-            let availableQuestions = questionsCount;
+            let questionLimit = allQuestions.length;
             if (hostSubscription) {
                 if (hostSubscription.subscription_type.questions !== -1) {
-                    availableQuestions = Math.min(questionsCount, hostSubscription.subscription_type.questions);
+                    questionLimit = Math.min(allQuestions.length, hostSubscription.subscription_type.questions);
                 }
             } else {
                 // Free game - limit to 10 questions
-                availableQuestions = Math.min(questionsCount, 10);
+                questionLimit = Math.min(allQuestions.length, 10);
             }
+
+            // Shuffle and take the limited number of questions
+            const shuffledQuestions = allQuestions.sort(() => 0.5 - Math.random());
+            const selectedQuestions = shuffledQuestions.slice(0, questionLimit);
 
             // Start the game
             await this.prisma.game.update({
@@ -3670,7 +3606,7 @@ export class GamePlayerService {
                 data: {
                     status: 'in_progress',
                     game_phase: 'question',
-                    total_questions: availableQuestions,
+                    total_questions: questionLimit,
                     current_question: 1, // Start with first question
                     current_turn: 1,
                     current_player_id: game.game_players[0].id // First player's turn
@@ -3690,12 +3626,12 @@ export class GamePlayerService {
 
             return {
                 success: true,
-                message: 'Category selected and game started successfully',
+                message: 'Category selected and game started successfully with all questions',
                 data: {
                     category: category,
                     difficulty: difficulty,
-                    total_questions: availableQuestions,
-                    available_questions: questionsCount,
+                    total_questions: questionLimit,
+                    available_questions: allQuestions.length,
                     phase: 'question',
                     current_player: {
                         id: game.game_players[0].id,
@@ -3706,6 +3642,18 @@ export class GamePlayerService {
                         id: player.id,
                         name: player.player_name || player.user?.name || 'Unknown',
                         player_order: player.player_order
+                    })),
+                    questions: selectedQuestions.map(question => ({
+                        id: question.id,
+                        text: question.text,
+                        points: question.points,
+                        time_limit: question.time,
+                        file_url: question.file_url,
+                        answers: question.answers.map(answer => ({
+                            id: answer.id,
+                            text: answer.text,
+                            file_url: answer.file_url
+                        }))
                     }))
                 }
             };
@@ -4287,6 +4235,189 @@ export class GamePlayerService {
             return {
                 success: false,
                 message: `Error getting debug info: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Get Quick Game status with scores and progress
+     */
+    async getQuickGameStatus(gameId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true },
+                        orderBy: { score: 'desc' }
+                    },
+                    game_selections: {
+                        orderBy: { created_at: 'desc' },
+                        take: 1,
+                        include: {
+                            category: true,
+                            difficulty: true
+                        }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Get total answers for this game
+            const totalAnswers = await this.prisma.playerAnswer.count({
+                where: {
+                    game_player: {
+                        game_id: gameId
+                    }
+                }
+            });
+
+            // Get correct answers count
+            const correctAnswers = await this.prisma.playerAnswer.count({
+                where: {
+                    game_player: {
+                        game_id: gameId
+                    },
+                    isCorrect: true
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Game status retrieved successfully',
+                data: {
+                    game: {
+                        id: game.id,
+                        status: game.status,
+                        game_phase: game.game_phase,
+                        current_question: game.current_question,
+                        total_questions: game.total_questions,
+                        progress_percentage: Math.round((game.current_question / game.total_questions) * 100)
+                    },
+                    category: game.game_selections[0]?.category || null,
+                    difficulty: game.game_selections[0]?.difficulty || null,
+                    players: game.game_players.map(player => ({
+                        id: player.id,
+                        name: player.player_name || player.user?.name || 'Unknown',
+                        score: player.score,
+                        correct_answers: player.correct_answers,
+                        wrong_answers: player.wrong_answers,
+                        skipped_answers: player.skipped_answers,
+                        player_order: player.player_order
+                    })),
+                    game_stats: {
+                        total_answers: totalAnswers,
+                        correct_answers: correctAnswers,
+                        wrong_answers: totalAnswers - correctAnswers,
+                        accuracy_percentage: totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0
+                    }
+                }
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error getting game status: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * End Quick Game and get final results
+     */
+    async endQuickGame(gameId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true },
+                        orderBy: { score: 'desc' }
+                    },
+                    game_selections: {
+                        orderBy: { created_at: 'desc' },
+                        take: 1,
+                        include: {
+                            category: true,
+                            difficulty: true
+                        }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Update game status to completed
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    status: 'completed',
+                    game_phase: 'completed'
+                }
+            });
+
+            // Calculate final rankings
+            const rankedPlayers = game.game_players.map((player, index) => ({
+                id: player.id,
+                name: player.player_name || player.user?.name || 'Unknown',
+                score: player.score,
+                correct_answers: player.correct_answers,
+                wrong_answers: player.wrong_answers,
+                skipped_answers: player.skipped_answers,
+                final_rank: index + 1,
+                player_order: player.player_order
+            }));
+
+            // Get game statistics
+            const totalAnswers = await this.prisma.playerAnswer.count({
+                where: {
+                    game_player: {
+                        game_id: gameId
+                    }
+                }
+            });
+
+            const correctAnswers = await this.prisma.playerAnswer.count({
+                where: {
+                    game_player: {
+                        game_id: gameId
+                    },
+                    isCorrect: true
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Game ended successfully',
+                data: {
+                    game: {
+                        id: game.id,
+                        status: 'completed',
+                        total_questions: game.total_questions,
+                        current_question: game.current_question
+                    },
+                    category: game.game_selections[0]?.category || null,
+                    difficulty: game.game_selections[0]?.difficulty || null,
+                    final_leaderboard: rankedPlayers,
+                    winner: rankedPlayers[0], // Highest score
+                    game_stats: {
+                        total_answers: totalAnswers,
+                        correct_answers: correctAnswers,
+                        wrong_answers: totalAnswers - correctAnswers,
+                        accuracy_percentage: totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0
+                    }
+                }
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error ending game: ${error.message}`,
                 data: null
             };
         }

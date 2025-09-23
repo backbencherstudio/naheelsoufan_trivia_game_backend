@@ -531,33 +531,6 @@ export class GamePlayerController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get Quick Game status' })
-  @Get('quick-game/status/:gameId')
-  async getQuickGameStatus(@Param('gameId') gameId: string) {
-    try {
-      return await this.gamePlayerService.getQuickGameStatus(gameId);
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'End Quick Game' })
-  @Post('quick-game/end')
-  async endQuickGame(@Body() dto: EndQuickGameDto) {
-    try {
-      return await this.gamePlayerService.endQuickGame(dto.game_id);
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
 
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Add multiple players to Quick Game at once' })
@@ -866,6 +839,34 @@ export class GamePlayerController {
   async getGameDebugInfo(@Param('gameId') gameId: string) {
     try {
       return await this.gamePlayerService.getGameDebugInfo(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get Quick Game status with scores and progress' })
+  @Get('quick-game/status/:gameId')
+  async getQuickGameStatus(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getQuickGameStatus(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'End Quick Game and get final results' })
+  @Post('quick-game/end')
+  async endQuickGame(@Body() dto: { game_id: string }) {
+    try {
+      return await this.gamePlayerService.endQuickGame(dto.game_id);
     } catch (error) {
       return {
         success: false,
