@@ -17,7 +17,7 @@ import { Readable } from 'stream';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly appService: AppService) { }
 
   @Get()
   getHello(): string {
@@ -32,7 +32,7 @@ export class AppController {
     res.flushHeaders(); // make sure headers are sent immediately
 
     const stream = new Readable({
-      read() {},
+      read() { },
     });
 
     // Pipe the stream to the response

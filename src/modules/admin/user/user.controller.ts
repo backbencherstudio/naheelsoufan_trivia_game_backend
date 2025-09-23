@@ -56,7 +56,7 @@ export class UserController {
   ) {
     try {
       const searchQuery = query.q || null;
-      const type = query.type;
+      const type = query.type || 'admin';
       const approved = query.approved;
       const role = query.role; // host or player
       const page = parseInt(query.page) || 1;

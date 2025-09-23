@@ -35,6 +35,11 @@ export class LanguageService {
         },
       });
 
+      // add file url
+      if (language && language.file_url) {
+        language['file_url'] = SojebStorage.url(appConfig().storageUrl.language + language.file_url);
+      }
+
       return {
         success: true,
         message: 'Language created successfully',
