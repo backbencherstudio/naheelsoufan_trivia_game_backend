@@ -1,96 +1,38 @@
 [
   {
-    "text": "What is the largest continent by area?",
+    "text": "What is the capital of France?",
     "category_id": "cmei5s7rm0007wseobs2vdf4s",
     "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxvjpk000rwsasge0g6vnd",
+    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
     "question_type_id": "cmee2pncu0001ws20gkdui4sv",
     "time": 45,
     "free_bundle": false,
     "firebase": true,
-    "points": 6,
-    "answers": [
-      {
-        "text": "Asia",
-        "is_correct": true
-      },
-      {
-        "text": "Africa",
-        "is_correct": false
-      },
-      {
-        "text": "North America",
-        "is_correct": false
-      },
-      {
-        "text": "Europe",
-        "is_correct": false
-      }
-    ]
-  },
-  {
-    "text": "What is the boiling point of water at sea level?",
-    "category_id": "cmei5s7rm0007wseobs2vdf4s",
-    "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxvjpk000rwsasge0g6vnd",
-    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 60,
-    "free_bundle": true,
-    "firebase": false,
     "points": 5,
     "answers": [
       {
-        "text": "100°C",
+        "text": "Paris",
         "is_correct": true
       },
       {
-        "text": "90°C",
+        "text": "London",
         "is_correct": false
       },
       {
-        "text": "110°C",
+        "text": "Berlin",
         "is_correct": false
       },
       {
-        "text": "212°F",
+        "text": "Rome",
         "is_correct": false
       }
     ]
   },
   {
-    "text": "Which of the following is a prime number?",
+    "text": "What is the largest mammal in the world?",
     "category_id": "cmei5s7rm0007wseobs2vdf4s",
     "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxvjpk000rwsasge0g6vnd",
-    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 40,
-    "free_bundle": false,
-    "firebase": true,
-    "points": 7,
-    "answers": [
-      {
-        "text": "7",
-        "is_correct": true
-      },
-      {
-        "text": "8",
-        "is_correct": false
-      },
-      {
-        "text": "9",
-        "is_correct": false
-      },
-      {
-        "text": "10",
-        "is_correct": false
-      }
-    ]
-  },
-  {
-    "text": "Which country is known as the Land of the Rising Sun?",
-    "category_id": "cmei5s7rm0007wseobs2vdf4s",
-    "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxvjpk000rwsasge0g6vnd",
+    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
     "question_type_id": "cmee2pncu0001ws20gkdui4sv",
     "time": 50,
     "free_bundle": true,
@@ -98,48 +40,106 @@
     "points": 6,
     "answers": [
       {
-        "text": "Japan",
+        "text": "Blue Whale",
         "is_correct": true
       },
       {
-        "text": "China",
+        "text": "Elephant",
         "is_correct": false
       },
       {
-        "text": "South Korea",
+        "text": "Giraffe",
         "is_correct": false
       },
       {
-        "text": "Thailand",
+        "text": "Shark",
         "is_correct": false
       }
     ]
   },
   {
-    "text": "Which organ is primarily responsible for pumping blood throughout the human body?",
+    "text": "What is the square root of 64?",
     "category_id": "cmei5s7rm0007wseobs2vdf4s",
     "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxvjpk000rwsasge0g6vnd",
+    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
     "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 40,
+    "time": 30,
     "free_bundle": false,
     "firebase": true,
-    "points": 8,
+    "points": 4,
     "answers": [
       {
-        "text": "Heart",
+        "text": "8",
         "is_correct": true
       },
       {
-        "text": "Lungs",
+        "text": "6",
         "is_correct": false
       },
       {
-        "text": "Liver",
+        "text": "10",
         "is_correct": false
       },
       {
-        "text": "Kidneys",
+        "text": "12",
+        "is_correct": false
+      }
+    ]
+  },
+  {
+    "text": "Who wrote the play 'Romeo and Juliet'?",
+    "category_id": "cmei5s7rm0007wseobs2vdf4s",
+    "language_id": "cmee1gu4i0000wsa80neoo1x7",
+    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
+    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
+    "time": 60,
+    "free_bundle": true,
+    "firebase": false,
+    "points": 5,
+    "answers": [
+      {
+        "text": "William Shakespeare",
+        "is_correct": true
+      },
+      {
+        "text": "Charles Dickens",
+        "is_correct": false
+      },
+      {
+        "text": "Jane Austen",
+        "is_correct": false
+      },
+      {
+        "text": "Mark Twain",
+        "is_correct": false
+      }
+    ]
+  },
+  {
+    "text": "What is the hardest natural substance on Earth?",
+    "category_id": "cmei5s7rm0007wseobs2vdf4s",
+    "language_id": "cmee1gu4i0000wsa80neoo1x7",
+    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
+    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
+    "time": 50,
+    "free_bundle": false,
+    "firebase": true,
+    "points": 7,
+    "answers": [
+      {
+        "text": "Diamond",
+        "is_correct": true
+      },
+      {
+        "text": "Gold",
+        "is_correct": false
+      },
+      {
+        "text": "Iron",
+        "is_correct": false
+      },
+      {
+        "text": "Platinum",
         "is_correct": false
       }
     ]

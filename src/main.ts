@@ -25,6 +25,7 @@ async function bootstrap() {
 
   // Configure CORS with specific settings
   const allowedOrigins = [
+    'http://localhost:3000',
     'http://localhost:6000',
     'https://naheelsoufan-dynamic-trivia-game-fr.vercel.app',
     '*',

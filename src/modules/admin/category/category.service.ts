@@ -41,6 +41,10 @@ export class CategoryService {
         },
       });
 
+      if (category && category.image) {
+        category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+      }
+
       return {
         success: true,
         message: 'Category created successfully',

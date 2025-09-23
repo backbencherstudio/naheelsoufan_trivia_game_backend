@@ -27,7 +27,7 @@ import { ApiTags } from '@nestjs/swagger';
 @Roles(Role.ADMIN)
 @Controller('admin/website-info')
 export class WebsiteInfoController {
-  constructor(private readonly websiteInfoService: WebsiteInfoService) {}
+  constructor(private readonly websiteInfoService: WebsiteInfoService) { }
 
   @ApiOperation({ summary: 'Update website info' })
   @Post()

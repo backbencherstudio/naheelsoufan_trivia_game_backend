@@ -10,28 +10,22 @@ export class DashboardService {
         try {
             // Get total counts in parallel for better performance
             const [
-                totalUsers,
+                totalPlayers,
                 totalQuestions,
                 totalCategories,
                 totalHosts,
                 totalGames,
                 totalSubscriptions,
-                recentUsers,
+                recentPlayers,
                 recentGames
             ] = await Promise.all([
-                this.prisma.user.count(),
+                this.prisma.gamePlayer.count(),
                 this.prisma.question.count(),
                 this.prisma.category.count(),
-                this.prisma.user.count({
-                    where: {
-                        games: {
-                            some: {}
-                        }
-                    }
-                }),
+                this.prisma.gamePlayer.count({  }),
                 this.prisma.game.count(),
                 this.prisma.subscription.count(),
-                this.prisma.user.count({
+                this.prisma.gamePlayer.count({
                     where: {
                         created_at: {
                             gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
@@ -72,7 +66,7 @@ export class DashboardService {
                 message: 'Dashboard statistics retrieved successfully',
                 data: {
                     overview: {
-                        totalUsers,
+                        totalPlayers,
                         totalQuestions,
                         totalCategories,
                         totalHosts,
@@ -82,11 +76,11 @@ export class DashboardService {
                         totalRevenue
                     },
                     recent: {
-                        newUsersLast7Days: recentUsers,
+                        newPlayersLast7Days: recentPlayers,
                         newGamesLast7Days: recentGames
                     },
                     growth: {
-                        userGrowthRate: this.calculateGrowthRate(totalUsers, recentUsers),
+                        playerGrowthRate: this.calculateGrowthRate(totalPlayers, recentPlayers),
                         gameGrowthRate: this.calculateGrowthRate(totalGames, recentGames)
                     }
                 }

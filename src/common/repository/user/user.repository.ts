@@ -197,7 +197,7 @@ export class UserRepository {
     password,
     phone_number,
     role_id = null,
-    type = 'user',
+    type = 'admin',
   }: {
     name?: string;
     first_name?: string;

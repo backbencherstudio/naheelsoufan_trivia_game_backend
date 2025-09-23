@@ -15,7 +15,7 @@ export class MessageService {
   constructor(
     private prisma: PrismaService,
     private readonly messageGateway: MessageGateway,
-  ) {}
+  ) { }
 
   async create(user_id: string, createMessageDto: CreateMessageDto) {
     try {
@@ -64,7 +64,7 @@ export class MessageService {
       const message = await this.prisma.message.create({
         data: {
           ...data,
-          status: 'SENT',
+          status: "SENT",
           sender_id: user_id,
         },
       });
@@ -218,11 +218,14 @@ export class MessageService {
   }
 
   async updateMessageStatus(message_id: string, status: string) {
-    return await ChatRepository.updateMessageStatus(message_id, status as any);
+    return await ChatRepository.updateMessageStatus(message_id, status);
   }
 
   async readMessage(message_id: string) {
-    return await ChatRepository.updateMessageStatus(message_id, 'READ' as any);
+    return await ChatRepository.updateMessageStatus(
+      message_id,
+      "READ",
+    );
   }
 
   async updateUserStatus(user_id: string, status: string) {

@@ -66,6 +66,19 @@ export class QuestionService {
         });
       }
 
+      // question file get
+      if (question.file_url) {
+        question['file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
+      }
+      // answers file get
+      if (answers && answers.length > 0) {
+        for (const answer of answers) {
+          if (answer.file_url) {
+            answer['file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
+          }
+        }
+      }
+
       return {
         success: true,
         message: 'Question and answers created successfully',
