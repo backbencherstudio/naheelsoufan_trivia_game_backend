@@ -36,6 +36,7 @@ model User {
   deleted_at                DateTime?
   status                    Int?           @default(1) @db.SmallInt
   approved_at               DateTime?
+  googleId          String?   @unique
   availability              String?
   email                     String?        @unique
   username                  String?        @unique
@@ -228,12 +229,19 @@ model PaymentTransaction {
   @@map("payment_transactions")
 }
 
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+}
+
 model Message {
   id              String        @id @default(cuid())
   created_at      DateTime      @default(now())
   updated_at      DateTime      @default(now())
   deleted_at      DateTime?
-  status          String?       @default("pending")
+  status          MessageStatus @default(PENDING)
   sender_id       String?
   receiver_id     String?
   conversation_id String?
@@ -437,12 +445,38 @@ model Game {
   host_id String?
   host    User?   @relation(fields: [host_id], references: [id])
 
+  current_player_id String? // Track whose turn it is
+  current_turn      Int           @default(1) // Turn counter
+  game_phase        String        @default("waiting") // waiting, category_selection, question, completed
+  total_questions   Int           @default(0) // Total questions in this game
+  current_question  Int           @default(0) // Current question number
   // Relations
-  game_players GamePlayer[] // Players in this game
-  rooms        Room[]
-  leaderboards Leaderboard[]
+  game_players      GamePlayer[] // Players in this game
+  rooms             Room[]
+  leaderboards      Leaderboard[]
+
+  game_selections GameSelection[]
 
   @@map("games")
+}
+
+
+model GameSelection {
+  id             String   @id @default(cuid())
+  game_id        String
+  player_id      String   // GamePlayer ID
+  category_id    String
+  difficulty_id  String
+  points         Int      // Points for this selection
+  is_used        Boolean  @default(false)
+  created_at     DateTime @default(now())
+  
+  game           Game       @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  player         GamePlayer @relation(fields: [player_id], references: [id], onDelete: Cascade)
+  category       Category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  difficulty     Difficulty @relation(fields: [difficulty_id], references: [id], onDelete: Cascade)
+
+  @@map("game_selections")
 }
 
 model GamePlayer {
@@ -462,7 +496,9 @@ model GamePlayer {
   game            Game           @relation(fields: [game_id], references: [id], onDelete: Cascade)
   room            Room?          @relation(fields: [room_id], references: [id])
   user            User?          @relation(fields: [user_id], references: [id])
+  is_guest        Boolean  @default(false)
   player_answers  PlayerAnswer[]
+  game_selections GameSelection[]
 
   @@map("game_players")
 }
@@ -543,6 +579,8 @@ model Difficulty {
   language  Language   @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
   questions Question[] // Related questions of this difficulty level
 
+  game_selections GameSelection[]
+
   @@map("difficulties") // Table name in database
 }
 
@@ -570,6 +608,8 @@ model Category {
   language     Language      @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
   questions    Question[] // Related questions
   leaderboards Leaderboard[]
+
+  game_selections GameSelection[]
 
   @@map("categories") // Table name in database
 }

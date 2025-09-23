@@ -1,6 +1,12 @@
 // external imports
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRedis } from '@nestjs-modules/ioredis';
 //internal imports
 import appConfig from '../../config/app.config';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -12,6 +18,9 @@ import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
 import { DateHelper } from '../../common/helper/date.helper';
 import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
 import { StringHelper } from '../../common/helper/string.helper';
+import { Message } from '../chat/message/entities/message.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import Redis from 'ioredis';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +28,7 @@ export class AuthService {
     private jwtService: JwtService,
     private prisma: PrismaService,
     private mailService: MailService,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   async me(userId: string) {
@@ -234,9 +244,40 @@ export class AuthService {
         type: user.type,
       };
     } catch (error) {
-              console.log('============error.message========================');
-        console.log(error.message);
-        console.log('====================================');
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // google log in using passport.js
+  async googleLogin({ email, userId }: { email: string; userId: string }) {
+    try {
+      const payload = { email: email, sub: userId };
+
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+      const user = await UserRepository.getUserDetails(userId);
+
+      await this.redis.set(
+        `refresh_token:${user.id}`,
+        refreshToken,
+        'EX',
+        60 * 60 * 24 * 7,
+      );
+
+      return {
+        message: 'Logged in successfully',
+        authorization: {
+          type: 'bearer',
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        },
+        type: user.type,
+      };
+    } catch (error) {
       return {
         success: false,
         message: error.message,
@@ -290,22 +331,21 @@ export class AuthService {
       }
 
       // create stripe customer account
-      const stripeCustomer = await StripePayment.createCustomer({
-        user_id: user.data.id,
-        email: email,
-        name: name,
-      });
-
-      if (stripeCustomer) {
-        await this.prisma.user.update({
-          where: {
-            id: user.data.id,
-          },
-          data: {
-            billing_id: stripeCustomer.id,
-          },
+      // Creating Stripe customer account
+      try {
+        const stripeCustomer = await StripePayment.createCustomer({
+          user_id: user.data.id,
+          email: email,
+          name: name,
         });
-      }
+
+        if (stripeCustomer) {
+          await this.prisma.user.update({
+            where: { id: user.data.id },
+            data: { billing_id: stripeCustomer.id },
+          });
+        }
+      } catch (error) {}
 
       // ----------------------------------------------------
       // // create otp code
@@ -337,7 +377,7 @@ export class AuthService {
       // Send verification email with token
       await this.mailService.sendVerificationLink({
         email,
-        name: email,
+        name: name,
         token: token.token,
         type: type,
       });

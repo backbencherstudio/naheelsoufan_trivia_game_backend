@@ -4,7 +4,7 @@ import { MiddlewareConsumer, Module } from '@nestjs/common';
 // import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
-
+import { RedisModule } from '@nestjs-modules/ioredis';
 // internal imports
 import appConfig from './config/app.config';
 import { AppController } from './app.controller';
@@ -25,6 +25,14 @@ import { PaymentModule } from './modules/payment/payment.module';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig],
+    }),
+    RedisModule.forRoot({
+      type: 'single',
+      options: {
+        host: appConfig().redis.host,
+        password: appConfig().redis.password,
+        port: +appConfig().redis.port,
+      },
     }),
     BullModule.forRoot({
       connection: {

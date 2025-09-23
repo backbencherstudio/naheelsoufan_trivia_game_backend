@@ -50,7 +50,8 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      const msg =
+        'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -92,10 +93,12 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new CustomExceptionFilter());
 
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true
-  }))
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   // storage setup
   SojebStorage.config({
@@ -125,7 +128,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
   // end swagger
 
-  app.useGlobalFilters(new AllExceptionsFilter())
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   await app.listen(process.env.PORT ?? 4000, '0.0.0.0');
 }

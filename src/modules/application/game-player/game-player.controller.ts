@@ -14,6 +14,8 @@ import { GamePlayerService } from './game-player.service';
 import { JoinGameDto, LeaveGameDto } from './dto/join-game.dto';
 import { AnswerQuestionDto, SkipQuestionDto } from './dto/answer-question.dto';
 import { StartGameDto, EndGameDto, UpdateScoreDto, GetGameQuestionsDto } from './dto/gameplay.dto';
+import { StartTurnDto, SelectCategoryDto, AddGuestPlayerDto, GetGameStateDto, NextTurnDto, AnswerQuestionDto as GameFlowAnswerDto, StealQuestionDto as GameFlowStealQuestionDto, EndGameDto as GameFlowEndDto } from './dto/game-flow.dto';
+import { AddQuickGamePlayerDto, StartQuickGameDto, SelectQuickGameCategoryDto, AnswerQuickGameQuestionDto, StealQuickGameQuestionDto, EndQuickGameDto, GetQuickGameStatusDto, AddMultipleQuickGamePlayersDto, AddPlayersAndStartGameDto, SelectCompetitiveCategoryDto, AnswerCompetitiveQuestionDto, GetCompetitiveQuestionDto, GetCompetitiveGameStatusDto, HostSelectCategoryDto, HostAnswerQuestionDto, HostStealQuestionDto, HostSkipQuestionDto, HostStartGameDto, AddPlayersOnlyDto, SelectCategoryAndStartDto, PlayerAnswerQuestionDto, StealQuestionDto } from './dto/quick-game.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
@@ -297,4 +299,580 @@ export class GamePlayerController {
       };
     }
   }
+
+  // ===== GAME FLOW ENDPOINTS =====
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current player whose turn it is' })
+  @Get('current-player/:gameId')
+  async getCurrentPlayer(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getCurrentPlayer(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Move to the next turn' })
+  @Post('next-turn')
+  async nextTurn(@Body() dto: NextTurnDto) {
+    try {
+      return await this.gamePlayerService.nextTurn(dto.game_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Start a player turn' })
+  @Post('start-turn')
+  async startPlayerTurn(@Body() dto: StartTurnDto, @Req() req: any) {
+    try {
+      const userId = req.user.userId;
+      // Find the player ID for the current user in this game
+      const gameState = await this.gamePlayerService.getGameState(dto.game_id);
+      if (!gameState.success) {
+        return gameState;
+      }
+      
+      const player = gameState.data.players.find(p => p.user_id === userId);
+      if (!player) {
+        return {
+          success: false,
+          message: 'Player not found in this game',
+        };
+      }
+      
+      return await this.gamePlayerService.startPlayerTurn(dto.game_id, player.id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current game state' })
+  @Get('game-state/:gameId')
+  async getGameState(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getGameState(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Check if game is completed' })
+  @Get('check-completion/:gameId')
+  async checkGameCompletion(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.checkGameCompletion(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // ===== GUEST PLAYER ENDPOINTS =====
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add guest player to game' })
+  @Post('add-guest-player')
+  async addGuestPlayer(@Body() dto: AddGuestPlayerDto) {
+    try {
+      return await this.gamePlayerService.addGuestPlayer(dto.game_id, dto.player_name);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get all guest players in a game' })
+  @Get('guest-players/:gameId')
+  async getGuestPlayers(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getGuestPlayers(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Remove guest player from game' })
+  @Delete('remove-guest-player/:gameId/:playerId')
+  async removeGuestPlayer(@Param('gameId') gameId: string, @Param('playerId') playerId: string) {
+    try {
+      return await this.gamePlayerService.removeGuestPlayer(gameId, playerId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // ===== QUICK GAME ENDPOINTS =====
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add player to Quick Game' })
+  @Post('quick-game/add-player')
+  async addQuickGamePlayer(@Body() dto: AddQuickGamePlayerDto) {
+    try {
+      return await this.gamePlayerService.addQuickGamePlayer(dto.game_id, dto.player_name);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Start Quick Game' })
+  @Post('quick-game/start')
+  async startQuickGame(@Body() dto: StartQuickGameDto) {
+    try {
+      return await this.gamePlayerService.startQuickGame(dto.game_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current turn in Quick Game' })
+  @Get('quick-game/current-turn/:gameId')
+  async getQuickGameCurrentTurn(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getQuickGameCurrentTurn(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Select category and difficulty for current turn' })
+  @Post('quick-game/select-category')
+  async selectQuickGameCategory(@Body() dto: SelectQuickGameCategoryDto) {
+    try {
+      return await this.gamePlayerService.selectQuickGameCategory(dto.game_id, dto.category_id, dto.difficulty_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get question for current turn' })
+  @Get('quick-game/question/:gameId')
+  async getQuickGameQuestion(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getQuickGameQuestion(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Answer question in Quick Game' })
+  @Post('quick-game/answer')
+  async answerQuickGameQuestion(@Body() dto: AnswerQuickGameQuestionDto) {
+    try {
+      return await this.gamePlayerService.answerQuickGameQuestion(dto.game_id, dto.question_id, dto.answer_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Steal question when player answers wrong' })
+  @Post('quick-game/steal-question')
+  async stealQuickGameQuestion(@Body() dto: StealQuickGameQuestionDto) {
+    try {
+      return await this.gamePlayerService.stealQuickGameQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.user_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add multiple players to Quick Game at once' })
+  @Post('quick-game/add-multiple-players')
+  async addMultipleQuickGamePlayers(@Body() dto: AddMultipleQuickGamePlayersDto) {
+    try {
+      return await this.gamePlayerService.addMultipleQuickGamePlayers(dto.game_id, dto.player_names);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add multiple players and start Quick Game immediately' })
+  @Post('quick-game/add-players-and-start')
+  async addPlayersAndStartQuickGame(@Body() dto: AddPlayersAndStartGameDto) {
+    try {
+      return await this.gamePlayerService.addPlayersAndStartQuickGame(dto.game_id, dto.player_names);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // ===== COMPETITIVE QUICK GAME ENDPOINTS =====
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Start Competitive Quick Game' })
+  @Post('competitive-quick-game/start/:gameId')
+  async startCompetitiveQuickGame(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.startCompetitiveQuickGame(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Select category and difficulty for competitive game' })
+  @Post('competitive-quick-game/select-category')
+  async selectCompetitiveCategory(@Body() dto: SelectCompetitiveCategoryDto) {
+    try {
+      return await this.gamePlayerService.selectCompetitiveCategory(dto.game_id, dto.category_id, dto.difficulty_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get next question for competitive game' })
+  @Get('competitive-quick-game/question/:gameId')
+  async getCompetitiveQuestion(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getCompetitiveQuestion(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Answer question in competitive game' })
+  @Post('competitive-quick-game/answer')
+  async answerCompetitiveQuestion(@Body() dto: AnswerCompetitiveQuestionDto) {
+    try {
+      return await this.gamePlayerService.answerCompetitiveQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get competitive game status' })
+  @Get('competitive-quick-game/status/:gameId')
+  async getCompetitiveGameStatus(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getCompetitiveGameStatus(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get player IDs for a game (debugging helper)' })
+  @Get('game/:gameId/player-ids')
+  async getGamePlayerIds(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getGamePlayerIds(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Debug JWT token validation' })
+  @Get('debug/jwt-test')
+  async debugJwtTest(@Req() req: any) {
+    try {
+      return {
+        success: true,
+        message: 'JWT token is valid',
+        data: {
+          user: req.user,
+          userId: req.user?.userId,
+          email: req.user?.email
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // ===== HOST-CONTROLLED GAME ENDPOINTS =====
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Host starts competitive game' })
+  @Post('host-game/start/:gameId')
+  async hostStartCompetitiveGame(@Param('gameId') gameId: string, @Req() req: any) {
+    try {
+      const hostUserId = req.user.userId;
+      return await this.gamePlayerService.hostStartCompetitiveGame(gameId, hostUserId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Host selects category and difficulty' })
+  @Post('host-game/select-category')
+  async hostSelectCategory(@Body() dto: HostSelectCategoryDto, @Req() req: any) {
+    try {
+      const hostUserId = req.user.userId;
+      return await this.gamePlayerService.hostSelectCategory(dto.game_id, dto.category_id, dto.difficulty_id, hostUserId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Host gets next question' })
+  @Get('host-game/question/:gameId')
+  async hostGetQuestion(@Param('gameId') gameId: string, @Req() req: any) {
+    try {
+      const hostUserId = req.user.userId;
+      return await this.gamePlayerService.hostGetQuestion(gameId, hostUserId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Host submits answer on behalf of a player' })
+  @Post('host-game/answer')
+  async hostAnswerQuestion(@Body() dto: HostAnswerQuestionDto, @Req() req: any) {
+    try {
+      const hostUserId = req.user.userId;
+      return await this.gamePlayerService.hostAnswerQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id, hostUserId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Host skips a question' })
+  @Post('host-game/skip-question')
+  async hostSkipQuestion(@Body() dto: HostSkipQuestionDto, @Req() req: any) {
+    try {
+      const hostUserId = req.user.userId;
+      return await this.gamePlayerService.hostSkipQuestion(dto.game_id, dto.question_id, hostUserId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Host gets game status' })
+  @Get('host-game/status/:gameId')
+  async hostGetGameStatus(@Param('gameId') gameId: string, @Req() req: any) {
+    try {
+      const hostUserId = req.user.userId;
+      return await this.gamePlayerService.hostGetGameStatus(gameId, hostUserId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // ===== QUICK GAME FLOW ENDPOINTS =====
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add players only (don\'t start game)' })
+  @Post('quick-game/add-players')
+  async addPlayersOnly(@Body() dto: AddPlayersOnlyDto) {
+    try {
+      return await this.gamePlayerService.addPlayersOnly(dto.game_id, dto.player_names);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Select category/difficulty and start game in one step' })
+  @Post('quick-game/select-category-and-start')
+  async selectCategoryAndStart(@Body() dto: SelectCategoryAndStartDto) {
+    try {
+      return await this.gamePlayerService.selectCategoryAndStart(dto.game_id, dto.category_id, dto.difficulty_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get question for current player' })
+  @Get('quick-game/question/:gameId')
+  async getPlayerQuestion(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getPlayerQuestion(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Player answers question' })
+  @Post('quick-game/answer')
+  async playerAnswerQuestion(@Body() dto: PlayerAnswerQuestionDto) {
+    try {
+      return await this.gamePlayerService.playerAnswerQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Steal question - forwards same question to next player' })
+  @Post('quick-game/steal-question')
+  async stealQuestion(@Body() dto: StealQuestionDto) {
+    try {
+      return await this.gamePlayerService.stealQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Debug - Get game details and selections' })
+  @Get('quick-game/debug/:gameId')
+  async getGameDebugInfo(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getGameDebugInfo(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get Quick Game status with scores and progress' })
+  @Get('quick-game/status/:gameId')
+  async getQuickGameStatus(@Param('gameId') gameId: string) {
+    try {
+      return await this.gamePlayerService.getQuickGameStatus(gameId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'End Quick Game and get final results' })
+  @Post('quick-game/end')
+  async endQuickGame(@Body() dto: { game_id: string }) {
+    try {
+      return await this.gamePlayerService.endQuickGame(dto.game_id);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
 }
