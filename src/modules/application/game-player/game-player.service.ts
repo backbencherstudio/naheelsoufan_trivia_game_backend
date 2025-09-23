@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, HttpException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, HttpException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { JoinGameDto, LeaveGameDto } from './dto/join-game.dto';
 import { AnswerQuestionDto, SkipQuestionDto } from './dto/answer-question.dto';
@@ -3011,6 +3011,1282 @@ export class GamePlayerService {
             return {
                 success: false,
                 message: `Error getting competitive game status: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    // ===== HOST-CONTROLLED GAME METHODS =====
+
+    /**
+     * Host starts the competitive game (authenticated user controls the game)
+     */
+    async hostStartCompetitiveGame(gameId: string, hostUserId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true },
+                        orderBy: { player_order: 'asc' }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Verify host is the game host
+            if (game.host_id !== hostUserId) {
+                throw new ForbiddenException('Only the game host can start the game');
+            }
+
+            if (game.game_players.length < 2) {
+                throw new BadRequestException('Need at least 2 players to start competitive game');
+            }
+
+            if (game.game_players.length > 4) {
+                throw new BadRequestException('Competitive Quick Game supports maximum 4 players');
+            }
+
+            // Set game to competitive mode with host control
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    status: 'in_progress',
+                    game_phase: 'category_selection',
+                    current_turn: 0, // No turns in competitive mode
+                    current_question: 0
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Host-controlled competitive game started successfully',
+                data: {
+                    game_id: gameId,
+                    host_id: hostUserId,
+                    phase: 'category_selection',
+                    total_players: game.game_players.length,
+                    players: game.game_players.map(player => ({
+                        id: player.id,
+                        name: player.player_name || player.user?.name || 'Unknown',
+                        is_guest: player.is_guest,
+                        player_order: player.player_order
+                    })),
+                    game_mode: 'host_controlled_competitive'
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error starting host-controlled game: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Host selects category and difficulty for the game
+     */
+    async hostSelectCategory(gameId: string, categoryId: string, difficultyId: string, hostUserId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: true,
+                    host: true
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Verify host is the game host
+            if (game.host_id !== hostUserId) {
+                throw new ForbiddenException('Only the game host can select category');
+            }
+
+            // Verify category and difficulty exist
+            const category = await this.prisma.category.findUnique({
+                where: { id: categoryId }
+            });
+
+            const difficulty = await this.prisma.difficulty.findUnique({
+                where: { id: difficultyId }
+            });
+
+            if (!category || !difficulty) {
+                throw new BadRequestException('Invalid category or difficulty');
+            }
+
+            // Get questions count for this category and difficulty
+            const questionsCount = await this.prisma.question.count({
+                where: {
+                    category_id: categoryId,
+                    difficulty_id: difficultyId
+                }
+            });
+
+            if (questionsCount === 0) {
+                throw new BadRequestException('No questions available for selected category and difficulty');
+            }
+
+            // Check subscription limits for questions
+            const hostSubscription = await this.prisma.subscription.findFirst({
+                where: {
+                    user_id: game.host_id,
+                    status: 'active'
+                },
+                include: {
+                    subscription_type: true
+                }
+            });
+
+            let availableQuestions = questionsCount;
+            if (hostSubscription) {
+                // Check if user has question limits
+                if (hostSubscription.subscription_type.questions !== -1) {
+                    availableQuestions = Math.min(questionsCount, hostSubscription.subscription_type.questions);
+                }
+            } else {
+                // Free game - limit to 10 questions
+                availableQuestions = Math.min(questionsCount, 10);
+            }
+
+            // Update game with category selection
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    game_phase: 'question',
+                    total_questions: availableQuestions,
+                    current_question: 0
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Host selected category and difficulty successfully',
+                data: {
+                    category: category,
+                    difficulty: difficulty,
+                    total_questions: availableQuestions,
+                    available_questions: questionsCount,
+                    phase: 'question',
+                    game_mode: 'host_controlled_competitive',
+                    host_id: hostUserId
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error selecting category: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Host gets next question for the game
+     */
+    async hostGetQuestion(gameId: string, hostUserId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Verify host is the game host
+            if (game.host_id !== hostUserId) {
+                throw new ForbiddenException('Only the game host can get questions');
+            }
+
+            if (game.game_phase !== 'question') {
+                throw new BadRequestException('Game is not in question phase');
+            }
+
+            if (game.current_question >= game.total_questions) {
+                // Game completed
+                await this.prisma.game.update({
+                    where: { id: gameId },
+                    data: {
+                        game_phase: 'completed',
+                        status: 'completed'
+                    }
+                });
+
+                return {
+                    success: true,
+                    message: 'Game completed! All questions answered.',
+                    data: {
+                        game_completed: true,
+                        total_questions: game.total_questions,
+                        questions_answered: game.current_question
+                    }
+                };
+            }
+
+            // Get the latest game selection to know category and difficulty
+            const gameSelection = await this.prisma.gameSelection.findFirst({
+                where: {
+                    game_id: gameId
+                },
+                include: {
+                    category: true,
+                    difficulty: true
+                },
+                orderBy: { created_at: 'desc' }
+            });
+
+            if (!gameSelection) {
+                throw new BadRequestException('No category/difficulty selected for this game');
+            }
+
+            // Get questions that haven't been answered yet
+            const answeredQuestionIds = await this.prisma.playerAnswer.findMany({
+                where: {
+                    game_player: {
+                        game_id: gameId
+                    }
+                },
+                select: {
+                    question_id: true
+                }
+            });
+
+            const answeredIds = answeredQuestionIds.map(a => a.question_id);
+
+            // Get a random unanswered question
+            const questions = await this.prisma.question.findMany({
+                where: {
+                    category_id: gameSelection.category_id,
+                    difficulty_id: gameSelection.difficulty_id,
+                    id: { notIn: answeredIds }
+                },
+                include: {
+                    answers: {
+                        select: {
+                            id: true,
+                            text: true,
+                            file_url: true
+                        }
+                    }
+                }
+            });
+
+            if (questions.length === 0) {
+                // No more questions available
+                await this.prisma.game.update({
+                    where: { id: gameId },
+                    data: {
+                        game_phase: 'completed',
+                        status: 'completed'
+                    }
+                });
+
+                return {
+                    success: true,
+                    message: 'Game completed! All questions answered.',
+                    data: {
+                        game_completed: true,
+                        total_questions: game.total_questions,
+                        questions_answered: game.current_question
+                    }
+                };
+            }
+
+            // Select random question
+            const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
+
+            // Update current question number
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    current_question: game.current_question + 1
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Question retrieved successfully',
+                data: {
+                    question: {
+                        id: randomQuestion.id,
+                        text: randomQuestion.text,
+                        points: randomQuestion.points,
+                        time_limit: randomQuestion.time,
+                        file_url: randomQuestion.file_url,
+                        category: gameSelection.category,
+                        difficulty: gameSelection.difficulty,
+                        answers: randomQuestion.answers
+                    },
+                    game_progress: {
+                        current_question: game.current_question + 1,
+                        total_questions: game.total_questions,
+                        remaining_questions: game.total_questions - (game.current_question + 1)
+                    },
+                    players: game.game_players.map(player => ({
+                        id: player.id,
+                        name: player.player_name || player.user?.name || 'Unknown',
+                        score: player.score,
+                        is_guest: player.is_guest
+                    })),
+                    host_id: hostUserId
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error getting question: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Host submits answer on behalf of a guest player
+     */
+    async hostAnswerQuestion(gameId: string, questionId: string, answerId: string, playerId: string, hostUserId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Verify host is the game host
+            if (game.host_id !== hostUserId) {
+                throw new ForbiddenException('Only the game host can submit answers');
+            }
+
+            const player = game.game_players.find(p => p.id === playerId);
+            if (!player) {
+                const availablePlayerIds = game.game_players.map(p => p.id);
+                const availablePlayerNames = game.game_players.map(p => p.player_name || p.user?.name || 'Unknown');
+                
+                throw new NotFoundException(
+                    `Player not found in this game. ` +
+                    `Looking for player ID: ${playerId}. ` +
+                    `Available players: ${availablePlayerIds.join(', ')} ` +
+                    `(${availablePlayerNames.join(', ')})`
+                );
+            }
+
+            // Get question with correct answer
+            const question = await this.prisma.question.findUnique({
+                where: { id: questionId },
+                include: { answers: true }
+            });
+
+            if (!question) {
+                throw new NotFoundException('Question not found');
+            }
+
+            const selectedAnswer = question.answers.find(a => a.id === answerId);
+            if (!selectedAnswer) {
+                throw new BadRequestException('Invalid answer selected');
+            }
+
+            // Check if already answered by this player
+            const existingAnswer = await this.prisma.playerAnswer.findFirst({
+                where: {
+                    game_player_id: playerId,
+                    question_id: questionId
+                }
+            });
+
+            if (existingAnswer) {
+                throw new BadRequestException('Question already answered by this player');
+            }
+
+            // Create player answer
+            await this.prisma.playerAnswer.create({
+                data: {
+                    game_player_id: playerId,
+                    question_id: questionId,
+                    answer_id: answerId,
+                    isCorrect: selectedAnswer.is_correct
+                }
+            });
+
+            const isCorrect = selectedAnswer.is_correct;
+            const pointsEarned = isCorrect ? question.points : 0;
+
+            // Update player stats
+            const updatedPlayer = await this.prisma.gamePlayer.update({
+                where: { id: playerId },
+                data: {
+                    score: { increment: pointsEarned },
+                    ...(isCorrect
+                        ? { correct_answers: { increment: 1 } }
+                        : { wrong_answers: { increment: 1 } }
+                    )
+                }
+            });
+
+            return {
+                success: true,
+                message: isCorrect ? 'Correct answer!' : 'Wrong answer!',
+                data: {
+                    is_correct: isCorrect,
+                    points_earned: pointsEarned,
+                    player_score: updatedPlayer.score,
+                    correct_answer: isCorrect ? null : question.answers.find(a => a.is_correct),
+                    player_id: playerId,
+                    player_name: player.player_name || player.user?.name || 'Unknown',
+                    host_id: hostUserId,
+                    game_continues: true
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error answering question: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Host skips a question
+     */
+    async hostSkipQuestion(gameId: string, questionId: string, hostUserId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Verify host is the game host
+            if (game.host_id !== hostUserId) {
+                throw new ForbiddenException('Only the game host can skip questions');
+            }
+
+            // Update current question number (skip this question)
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    current_question: game.current_question + 1
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Question skipped successfully',
+                data: {
+                    question_id: questionId,
+                    host_id: hostUserId,
+                    game_continues: true
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error skipping question: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Host gets game status
+     */
+    async hostGetGameStatus(gameId: string, hostUserId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true },
+                        orderBy: { score: 'desc' }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Verify host is the game host
+            if (game.host_id !== hostUserId) {
+                throw new ForbiddenException('Only the game host can view game status');
+            }
+
+            return {
+                success: true,
+                message: 'Host game status retrieved successfully',
+                data: {
+                    game: {
+                        id: game.id,
+                        mode: game.mode,
+                        status: game.status,
+                        phase: game.game_phase,
+                        current_question: game.current_question,
+                        total_questions: game.total_questions
+                    },
+                    players: game.game_players.map(player => ({
+                        id: player.id,
+                        name: player.player_name || player.user?.name || 'Unknown',
+                        score: player.score,
+                        correct_answers: player.correct_answers,
+                        wrong_answers: player.wrong_answers,
+                        player_order: player.player_order,
+                        is_guest: player.is_guest
+                    })),
+                    game_progress: {
+                        questions_answered: game.current_question,
+                        total_questions: game.total_questions,
+                        remaining_questions: game.total_questions - game.current_question,
+                        progress_percentage: game.total_questions > 0 ? Math.round((game.current_question / game.total_questions) * 100) : 0
+                    },
+                    host_id: hostUserId
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error getting host game status: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    // ===== MODIFIED GAME FLOW METHODS =====
+
+    /**
+     * Add players only (don't start game)
+     */
+    async addPlayersOnly(gameId: string, playerNames: string[]) {
+        try {
+            // Use existing addMultipleQuickGamePlayers method but don't start game
+            return await this.addMultipleQuickGamePlayers(gameId, playerNames);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error adding players: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Select category/difficulty and start game in one step
+     */
+    async selectCategoryAndStart(gameId: string, categoryId: string, difficultyId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true },
+                        orderBy: { player_order: 'asc' }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            if (game.game_players.length < 2) {
+                throw new BadRequestException('Need at least 2 players to start game');
+            }
+
+            // Verify category and difficulty exist
+            const category = await this.prisma.category.findUnique({
+                where: { id: categoryId }
+            });
+
+            const difficulty = await this.prisma.difficulty.findUnique({
+                where: { id: difficultyId }
+            });
+
+            if (!category || !difficulty) {
+                throw new BadRequestException('Invalid category or difficulty');
+            }
+
+            // Get questions count for this category and difficulty
+            const questionsCount = await this.prisma.question.count({
+                where: {
+                    category_id: categoryId,
+                    difficulty_id: difficultyId
+                }
+            });
+
+            if (questionsCount === 0) {
+                throw new BadRequestException('No questions available for selected category and difficulty');
+            }
+
+            // Check subscription limits for questions
+            const hostSubscription = await this.prisma.subscription.findFirst({
+                where: {
+                    user_id: game.host_id,
+                    status: 'active'
+                },
+                include: {
+                    subscription_type: true
+                }
+            });
+
+            let availableQuestions = questionsCount;
+            if (hostSubscription) {
+                if (hostSubscription.subscription_type.questions !== -1) {
+                    availableQuestions = Math.min(questionsCount, hostSubscription.subscription_type.questions);
+                }
+            } else {
+                // Free game - limit to 10 questions
+                availableQuestions = Math.min(questionsCount, 10);
+            }
+
+            // Start the game
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    status: 'in_progress',
+                    game_phase: 'question',
+                    total_questions: availableQuestions,
+                    current_question: 1, // Start with first question
+                    current_turn: 1,
+                    current_player_id: game.game_players[0].id // First player's turn
+                }
+            });
+
+            // Create game selection record
+            await this.prisma.gameSelection.create({
+                data: {
+                    game_id: gameId,
+                    category_id: categoryId,
+                    difficulty_id: difficultyId,
+                    points: difficulty.points,
+                    player_id: game.game_players[0].id // Host player
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Category selected and game started successfully',
+                data: {
+                    category: category,
+                    difficulty: difficulty,
+                    total_questions: availableQuestions,
+                    available_questions: questionsCount,
+                    phase: 'question',
+                    current_player: {
+                        id: game.game_players[0].id,
+                        name: game.game_players[0].player_name || game.game_players[0].user?.name || 'Unknown',
+                        player_order: 1
+                    },
+                    players: game.game_players.map(player => ({
+                        id: player.id,
+                        name: player.player_name || player.user?.name || 'Unknown',
+                        player_order: player.player_order
+                    }))
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error selecting category and starting game: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Player selects their own category and difficulty on their turn
+     */
+    async playerSelectCategory(gameId: string, categoryId: string, difficultyId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            const currentPlayer = game.game_players.find(p => p.id === game.current_player_id);
+            if (!currentPlayer) {
+                throw new NotFoundException('Current player not found');
+            }
+
+            // Verify category and difficulty exist
+            const category = await this.prisma.category.findUnique({
+                where: { id: categoryId }
+            });
+
+            const difficulty = await this.prisma.difficulty.findUnique({
+                where: { id: difficultyId }
+            });
+
+            if (!category || !difficulty) {
+                throw new BadRequestException('Invalid category or difficulty');
+            }
+
+            // Get questions count for this category and difficulty
+            const questionsCount = await this.prisma.question.count({
+                where: {
+                    category_id: categoryId,
+                    difficulty_id: difficultyId
+                }
+            });
+
+            if (questionsCount === 0) {
+                throw new BadRequestException('No questions available for selected category and difficulty');
+            }
+
+            // Create game selection record for this player
+            await this.prisma.gameSelection.create({
+                data: {
+                    game_id: gameId,
+                    player_id: currentPlayer.id,
+                    category_id: categoryId,
+                    difficulty_id: difficultyId,
+                    points: difficulty.points || 0
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Category and difficulty selected for current player',
+                data: {
+                    category: category,
+                    difficulty: difficulty,
+                    available_questions: questionsCount,
+                    current_player: {
+                        id: currentPlayer.id,
+                        name: currentPlayer.player_name || currentPlayer.user?.name || 'Unknown',
+                        player_order: currentPlayer.player_order
+                    }
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error selecting category: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Get question for current player (based on their category selection)
+     */
+    async getPlayerQuestion(gameId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true }
+                    },
+                    game_selections: {
+                        orderBy: { created_at: 'desc' },
+                        take: 1,
+                        include: {
+                            category: true,
+                            difficulty: true
+                        }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            if (!game.game_selections.length) {
+                throw new BadRequestException('No category/difficulty selected for this game. Please select category and difficulty first.');
+            }
+
+            const gameSelection = game.game_selections[0];
+
+            // Get all questions from the selected category and difficulty
+            const allQuestions = await this.prisma.question.findMany({
+                where: {
+                    category_id: gameSelection.category_id,
+                    difficulty_id: gameSelection.difficulty_id
+                },
+                include: {
+                    answers: {
+                        select: {
+                            id: true,
+                            text: true,
+                            file_url: true
+                        }
+                    }
+                }
+            });
+
+            if (allQuestions.length === 0) {
+                return {
+                    success: true,
+                    message: 'No questions available for this category and difficulty',
+                    data: {
+                        no_questions_available: true
+                    }
+                };
+            }
+
+            // Get a random question from the selected category and difficulty
+            const randomIndex = Math.floor(Math.random() * allQuestions.length);
+            const currentQuestion = allQuestions[randomIndex];
+
+            return {
+                success: true,
+                message: 'Question retrieved successfully',
+                data: {
+                    question: {
+                        id: currentQuestion.id,
+                        text: currentQuestion.text,
+                        points: currentQuestion.points,
+                        time_limit: currentQuestion.time,
+                        file_url: currentQuestion.file_url,
+                        category: gameSelection.category,
+                        difficulty: gameSelection.difficulty,
+                        answers: currentQuestion.answers
+                    },
+                    game_info: {
+                        category: gameSelection.category.name,
+                        difficulty: gameSelection.difficulty.name,
+                        points: gameSelection.points
+                    }
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error getting question: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Player answers question
+     */
+    async playerAnswerQuestion(gameId: string, questionId: string, answerId: string, playerId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Find the player who is answering (not necessarily current player)
+            const answeringPlayer = game.game_players.find(p => p.id === playerId);
+            if (!answeringPlayer) {
+                throw new NotFoundException('Player not found in this game');
+            }
+
+            // Get question with correct answer
+            const question = await this.prisma.question.findUnique({
+                where: { id: questionId },
+                include: { answers: true }
+            });
+
+            if (!question) {
+                throw new NotFoundException('Question not found');
+            }
+
+            const selectedAnswer = question.answers.find(a => a.id === answerId);
+            if (!selectedAnswer) {
+                throw new BadRequestException('Invalid answer selected');
+            }
+
+            // Check if already answered by this player
+            const existingAnswer = await this.prisma.playerAnswer.findFirst({
+                where: {
+                    game_player_id: answeringPlayer.id,
+                    question_id: questionId
+                }
+            });
+
+            if (existingAnswer) {
+                throw new BadRequestException('Question already answered by this player');
+            }
+
+            // Create player answer
+            await this.prisma.playerAnswer.create({
+                data: {
+                    game_player_id: answeringPlayer.id,
+                    question_id: questionId,
+                    answer_id: answerId,
+                    isCorrect: selectedAnswer.is_correct
+                }
+            });
+
+            const isCorrect = selectedAnswer.is_correct;
+            const pointsEarned = isCorrect ? question.points : 0;
+
+            // Update player stats
+            const updatedPlayer = await this.prisma.gamePlayer.update({
+                where: { id: answeringPlayer.id },
+                data: {
+                    score: { increment: pointsEarned },
+                    ...(isCorrect
+                        ? { correct_answers: { increment: 1 } }
+                        : { wrong_answers: { increment: 1 } }
+                    )
+                }
+            });
+
+            // If correct answer, move to next question. If wrong, question can be stolen
+            if (isCorrect) {
+                // Just increment the question counter, don't change the game state
+                await this.prisma.game.update({
+                    where: { id: gameId },
+                    data: {
+                        current_question: { increment: 1 }
+                    }
+                });
+            }
+
+            return {
+                success: true,
+                message: isCorrect ? 'Correct answer!' : 'Wrong answer!',
+                data: {
+                    is_correct: isCorrect,
+                    points_earned: pointsEarned,
+                    player_score: updatedPlayer.score,
+                    correct_answer: isCorrect ? null : question.answers.find(a => a.is_correct),
+                    player_id: answeringPlayer.id,
+                    player_name: answeringPlayer.player_name || answeringPlayer.user?.name || 'Unknown',
+                    next_turn: isCorrect
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error answering question: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Steal question - forwards the same question to all players
+     */
+    async stealQuestion(gameId: string, questionId: string, answerId: string, playerId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true }
+                    }
+                }
+            });
+
+            if (!game) {
+                throw new NotFoundException('Game not found');
+            }
+
+            // Get question with correct answer
+            const question = await this.prisma.question.findUnique({
+                where: { id: questionId },
+                include: { answers: true }
+            });
+
+            if (!question) {
+                throw new NotFoundException('Question not found');
+            }
+
+            const selectedAnswer = question.answers.find(a => a.id === answerId);
+            if (!selectedAnswer) {
+                throw new BadRequestException('Invalid answer selected');
+            }
+
+            // Find the stealing player
+            const stealingPlayer = game.game_players.find(p => p.id === playerId);
+            if (!stealingPlayer) {
+                throw new NotFoundException('Stealing player not found in this game');
+            }
+
+            // Check if stealing player has already answered this question
+            const existingAnswer = await this.prisma.playerAnswer.findFirst({
+                where: {
+                    game_player_id: stealingPlayer.id,
+                    question_id: questionId
+                }
+            });
+
+            if (existingAnswer) {
+                throw new BadRequestException('You have already answered this question');
+            }
+
+            // Record the stealing player's answer
+            await this.prisma.playerAnswer.create({
+                data: {
+                    game_player_id: stealingPlayer.id,
+                    question_id: questionId,
+                    answer_id: answerId,
+                    isCorrect: selectedAnswer.is_correct
+                }
+            });
+
+            const isCorrect = selectedAnswer.is_correct;
+            const pointsEarned = isCorrect ? question.points : 0;
+
+            // Update stealing player's stats
+            await this.prisma.gamePlayer.update({
+                where: { id: stealingPlayer.id },
+                data: {
+                    score: { increment: pointsEarned },
+                    ...(isCorrect
+                        ? { correct_answers: { increment: 1 } }
+                        : { wrong_answers: { increment: 1 } }
+                    )
+                }
+            });
+
+            // If correct answer, move to next question
+            if (isCorrect) {
+                // Just increment the question counter, don't change the game state
+                await this.prisma.game.update({
+                    where: { id: gameId },
+                    data: {
+                        current_question: { increment: 1 }
+                    }
+                });
+                return {
+                    success: true,
+                    message: 'Correct answer! Question stolen successfully!',
+                    data: {
+                        is_correct: true,
+                        points_earned: pointsEarned,
+                        player_id: stealingPlayer.id,
+                        player_name: stealingPlayer.player_name || stealingPlayer.user?.name || 'Unknown',
+                        next_question: true
+                    }
+                };
+            }
+
+            // Find the next player who hasn't answered this question yet
+            const answeredPlayerIds = await this.prisma.playerAnswer.findMany({
+                where: {
+                    question_id: questionId
+                },
+                select: {
+                    game_player_id: true
+                }
+            });
+
+            const answeredIds = answeredPlayerIds.map(a => a.game_player_id);
+
+            // Find next player who hasn't answered
+            const nextPlayer = game.game_players.find(p => !answeredIds.includes(p.id));
+            
+            if (!nextPlayer) {
+                // All players have answered this question
+                return {
+                    success: true,
+                    message: 'All players have answered this question',
+                    data: {
+                        all_players_answered: true,
+                        question_id: questionId
+                    }
+                };
+            }
+
+            // Set the next player as current
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    current_player_id: nextPlayer.id,
+                    current_turn: nextPlayer.player_order
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Question forwarded to next player',
+                data: {
+                    question: {
+                        id: question.id,
+                        text: question.text,
+                        points: question.points,
+                        time_limit: question.time,
+                        file_url: question.file_url,
+                        answers: question.answers
+                    },
+                    current_player: {
+                        id: nextPlayer.id,
+                        name: nextPlayer.player_name || nextPlayer.user?.name || 'Unknown',
+                        player_order: nextPlayer.player_order
+                    },
+                    question_forwarded: true
+                }
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error stealing question: ${error.message}`,
+                data: null
+            };
+        }
+    }
+
+    /**
+     * Move to next question from the same category and difficulty
+     */
+    private async nextQuestionFromSameCategory(gameId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_selections: {
+                        orderBy: { created_at: 'desc' },
+                        take: 1
+                    }
+                }
+            });
+
+            if (!game || !game.game_selections.length) {
+                throw new Error('Game or category selection not found');
+            }
+
+            const categorySelection = game.game_selections[0];
+            const categoryId = categorySelection.category_id;
+            const difficultyId = categorySelection.difficulty_id;
+
+            // Get all questions for this category and difficulty
+            const allQuestions = await this.prisma.question.findMany({
+                where: {
+                    category_id: categoryId,
+                    difficulty_id: difficultyId
+                }
+            });
+
+            // Check if we've reached the total questions limit
+            if (game.current_question >= game.total_questions) {
+                // Game completed
+                await this.prisma.game.update({
+                    where: { id: gameId },
+                    data: {
+                        status: 'completed',
+                        game_phase: 'completed'
+                    }
+                });
+                return;
+            }
+
+            // Move to next question (increment counter for tracking)
+            await this.prisma.game.update({
+                where: { id: gameId },
+                data: {
+                    current_question: game.current_question + 1
+                }
+            });
+
+        } catch (error) {
+            console.error('Error moving to next question:', error);
+        }
+    }
+
+    /**
+     * Debug method to get game details
+     */
+    async getGameDebugInfo(gameId: string) {
+        try {
+            const game = await this.prisma.game.findUnique({
+                where: { id: gameId },
+                include: {
+                    game_players: {
+                        include: { user: true }
+                    },
+                    game_selections: {
+                        include: {
+                            category: true,
+                            difficulty: true
+                        }
+                    }
+                }
+            });
+
+            if (!game) {
+                return {
+                    success: false,
+                    message: 'Game not found',
+                    data: null
+                };
+            }
+
+            return {
+                success: true,
+                message: 'Game debug info retrieved',
+                data: {
+                    game: {
+                        id: game.id,
+                        status: game.status,
+                        game_phase: game.game_phase,
+                        current_question: game.current_question,
+                        total_questions: game.total_questions,
+                        current_player_id: game.current_player_id,
+                        current_turn: game.current_turn
+                    },
+                    players: game.game_players.map(p => ({
+                        id: p.id,
+                        name: p.player_name || p.user?.name || 'Unknown',
+                        player_order: p.player_order
+                    })),
+                    game_selections: game.game_selections.map(gs => ({
+                        id: gs.id,
+                        category: gs.category.name,
+                        difficulty: gs.difficulty.name,
+                        points: gs.points,
+                        player_id: gs.player_id,
+                        created_at: gs.created_at
+                    }))
+                }
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error getting debug info: ${error.message}`,
                 data: null
             };
         }

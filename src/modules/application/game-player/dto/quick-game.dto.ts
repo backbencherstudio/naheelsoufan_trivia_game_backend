@@ -142,3 +142,135 @@ export class GetCompetitiveGameStatusDto {
     @IsNotEmpty()
     game_id: string;
 }
+
+// ===== HOST-CONTROLLED GAME DTOs =====
+
+export class HostSelectCategoryDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    category_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    difficulty_id: string;
+}
+
+export class HostAnswerQuestionDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    question_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    answer_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    player_id: string;  // Which guest player is answering
+}
+
+export class HostStealQuestionDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    question_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    answer_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    player_id: string;  // Which guest player is stealing
+}
+
+export class HostSkipQuestionDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    question_id: string;
+}
+
+export class HostStartGameDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+}
+
+// ===== MODIFIED GAME FLOW DTOs =====
+
+export class AddPlayersOnlyDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsArray()
+    @ArrayMinSize(2, { message: 'At least 2 players are required' })
+    @ArrayMaxSize(4, { message: 'Maximum 4 players allowed' })
+    @IsString({ each: true })
+    player_names: string[];
+}
+
+export class SelectCategoryAndStartDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    category_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    difficulty_id: string;
+}
+
+export class PlayerAnswerQuestionDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    question_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    answer_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    player_id: string;
+}
+
+export class StealQuestionDto {
+    @IsString()
+    @IsNotEmpty()
+    game_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    question_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    answer_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    player_id: string;
+}
