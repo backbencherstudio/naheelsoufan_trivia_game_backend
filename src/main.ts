@@ -12,6 +12,7 @@ import appConfig from './config/app.config';
 import { CustomExceptionFilter } from './common/exception/custom-exception.filter';
 import { SojebStorage } from './common/lib/Disk/SojebStorage';
 import { AllExceptionsFilter } from './utils/exceptions.filter';
+// import * as session from 'express-session';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -22,6 +23,17 @@ async function bootstrap() {
   // app.use('/payment/stripe/webhook', express.raw({ type: 'application/json' }));
 
   app.setGlobalPrefix('api');
+
+// app.use(
+//     session({
+//       secret: process.env.SESSION_SECRET || 'default_secret',
+//       resave: false,
+//       saveUninitialized: false,
+//       cookie: {
+//         secure: true, // https হলে true
+//       },
+//     }),
+//   );
 
   // Configure CORS with specific settings
   const allowedOrigins = [

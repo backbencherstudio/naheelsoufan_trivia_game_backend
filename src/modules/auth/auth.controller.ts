@@ -25,6 +25,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { AppleAuthGuard } from './guards/apple-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -155,6 +156,31 @@ export class AuthController {
       },
     });
   }
+
+  // apple login
+  @Get('apple')
+@UseGuards(AppleAuthGuard)
+async appleAuth(@Req() req) {
+  return HttpStatus.OK;
+}
+
+@Get('apple/redirect')
+@UseGuards(AppleAuthGuard)
+async appleAuthRedirect(@Req() req, @Res() res: Response) {
+  const { user, loginResponse } = req.user;
+
+  return res.json({
+    message: 'Logged in successfully via Apple',
+    authorization: loginResponse.authorization,
+    user: {
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      avatar: user.avatar,
+    },
+  });
+}
+
 
   // update user
   @ApiOperation({ summary: 'Update user' })

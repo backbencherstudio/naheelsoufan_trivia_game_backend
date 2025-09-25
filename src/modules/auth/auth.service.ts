@@ -285,6 +285,33 @@ export class AuthService {
     }
   }
 
+  // apple log in using passport.js
+  async appleLogin({ email, userId, aud }: { email: string; userId: string; aud: string }) {
+  try {
+    const payload = { email, sub: userId, aud };
+
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    const user = await UserRepository.getUserDetails(userId);
+
+    await this.redis.set(`refresh_token:${user.id}`, refreshToken, 'EX', 60 * 60 * 24 * 7);
+
+    return {
+      message: 'Logged in successfully',
+      authorization: {
+        type: 'bearer',
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      },
+      type: user.type,
+    };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}
+
+
   async register({
     name,
     first_name,

@@ -36,6 +36,7 @@ model User {
   deleted_at                DateTime?
   status                    Int?           @default(1) @db.SmallInt
   approved_at               DateTime?
+  apple_id                  String?        @unique
   googleId                  String?        @unique
   availability              String?
   email                     String?        @unique
