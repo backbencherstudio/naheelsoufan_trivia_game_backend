@@ -1,18 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, Profile } from 'passport-apple';
+// import { AppleStrategy } from 'passport-apple';
+import { Strategy, VerifyCallback } from 'passport-apple';
+import { AuthService } from '../auth.service';
+const AppleStrategy = require('passport-apple');
+import { PrismaService } from 'src/prisma/prisma.service';
+import appConfig from '../../../config/app.config';
 
 @Injectable()
-export class AppleStrategy extends PassportStrategy(Strategy, 'apple') {
-  constructor() {
+export class AppleLoginStrategy extends PassportStrategy(Strategy, 'apple') {
+  constructor(
+    private prisma: PrismaService,
+    private authService: AuthService,
+  ) {
     super({
-      clientID: process.env.APPLE_CLIENT_ID, // Service ID from Apple
-      teamID: process.env.APPLE_TEAM_ID, // Team ID from Apple Dev
-      keyID: process.env.APPLE_KEY_ID, // Key ID from Apple Dev
-      privateKeyString: process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // from .p8 file
-      callbackURL: process.env.APPLE_CALLBACK_URL, // redirect_uri
+      clientID: appConfig().auth.apple.client_id,
+      teamID: appConfig().auth.apple.team_id,
+      keyID: appConfig().auth.apple.key_id,
+      privateKey: process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      callbackURL: appConfig().auth.apple.callback,
       passReqToCallback: false,
       scope: ['name', 'email'],
+      session: true,
     });
   }
 
@@ -20,17 +29,44 @@ export class AppleStrategy extends PassportStrategy(Strategy, 'apple') {
     accessToken: string,
     refreshToken: string,
     idToken: any,
-    profile: Profile,
+    profile: any,
     done: Function,
-  ): Promise<any> {
-    // profile => contains user info (id, emails, etc.)
-    const user = {
-      id: profile.id,
-      email: profile.emails?.[0]?.value,
-      name: profile.name,
-      accessToken,
-    };
+    
+  ) {
+    console.log('--- Apple OAuth Validate Triggered ---');
+  console.log('accessToken:', accessToken);
+  console.log('refreshToken:', refreshToken);
+  console.log('idToken:', idToken);
+  console.log('profile:', profile);
+    // Apple এর user info structure
+    const { sub, email, aud } = idToken; // idToken থেকে মূল data
+    const firstName = profile?.name?.firstName || '';
+    const lastName = profile?.name?.lastName || '';
 
-    done(null, user);
+    let user = await this.prisma.user.findUnique({
+      where: { apple_id: sub },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          apple_id: sub, // database এ apple_id ফিল্ড
+          username: firstName + lastName || email,
+          name: firstName + lastName,
+          email: email,
+          first_name: firstName,
+          last_name: lastName,
+          avatar: '', // Apple profile এ picture নেই
+        },
+      });
+    }
+
+    const loginResponse = await this.authService.appleLogin({
+      email,
+      userId: user.id,
+      aud, // Apple এর extra info
+    });
+
+    done(null, { user, loginResponse });
   }
 }
