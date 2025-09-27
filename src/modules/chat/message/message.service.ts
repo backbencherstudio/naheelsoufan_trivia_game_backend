@@ -218,7 +218,7 @@ export class MessageService {
   }
 
   async updateMessageStatus(message_id: string, status: string) {
-    return await ChatRepository.updateMessageStatus(message_id, status);
+    return await ChatRepository.updateMessageStatus(message_id, status as any);
   }
 
   async readMessage(message_id: string) {

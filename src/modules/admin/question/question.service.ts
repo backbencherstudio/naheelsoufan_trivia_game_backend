@@ -44,7 +44,6 @@ export class QuestionService {
           question_type: { select: { id: true, name: true } },
         },
       });
-
       // Handle file uploads for the answers using map
       if (answers && answers.length > 0) {
         const answersData = answers.map((answer, index) => {
@@ -68,13 +67,13 @@ export class QuestionService {
 
       // question file get
       if (question.file_url) {
-        question['file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
+        question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
       }
       // answers file get
       if (answers && answers.length > 0) {
         for (const answer of answers) {
           if (answer.file_url) {
-            answer['file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
+            answer['answer_file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
           }
         }
       }
@@ -163,12 +162,12 @@ export class QuestionService {
       // Add file URLs for questions and answers
       for (const question of questions) {
         if (question.file_url) {
-          question['file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
+          question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
         }
         if (question.answers && question.answers.length > 0) {
           for (const answer of question.answers) {
             if (answer.file_url) {
-              answer['file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
+              answer['answer_file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
             }
           }
         }
@@ -253,14 +252,14 @@ export class QuestionService {
       // Check if the question exists and then process the file URL for the question
       if (question) {
         if (question.file_url) {
-          question['file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
+          question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
         }
 
         // Loop through the answers to append the file URL
         if (question.answers && question.answers.length > 0) {
           for (const answer of question.answers) {
             if (answer.file_url) {
-              answer['file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
+              answer['answer_file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
             }
           }
         }
@@ -311,7 +310,6 @@ export class QuestionService {
           updated_at: true,
         },
       });
-
       // If answers are provided, update them as well
       if (answers && answers.length > 0) {
         // Delete existing answers associated with this question
@@ -340,6 +338,12 @@ export class QuestionService {
           data: answersData,
         });
       }
+
+        // add question file url
+        if (updatedQuestion.file_url) {
+          updatedQuestion['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + updatedQuestion.file_url);
+        }
+       
 
       return {
         success: true,
@@ -449,8 +453,8 @@ export class QuestionService {
 
         try {
           // Validate required fields
-          if (!questionData.text || !questionData.category_id || !questionData.language_id ||
-            !questionData.difficulty_id || !questionData.question_type_id || !questionData.answers) {
+          if (!questionData.text || !questionData.category.id || !questionData.language.id ||
+            !questionData.difficulty.id || !questionData.question_type.id || !questionData.answers) {
             throw new Error(`Missing required fields in question ${i + 1}`);
           }
 
@@ -468,10 +472,11 @@ export class QuestionService {
           const question = await this.prisma.question.create({
             data: {
               text: questionData.text,
-              category_id: questionData.category_id,
-              language_id: questionData.language_id,
-              difficulty_id: questionData.difficulty_id,
-              question_type_id: questionData.question_type_id,
+              category_id: questionData.category.id,
+              language_id: questionData.language.id,
+              difficulty_id: questionData.difficulty.id,
+              question_type_id: questionData.question_type.id,
+              file_url: questionData.file_url || null,
               time: questionData.time || 30,
               points: questionData.points || 10,
               free_bundle: questionData.free_bundle || false,
@@ -527,12 +532,14 @@ export class QuestionService {
           points: true,
           free_bundle: true,
           firebase: true,
+          file_url: true,
           created_at: true,
           updated_at: true,
           category: {
             select: {
               id: true,
               name: true,
+              image: true,
             },
           },
           language: {
@@ -567,17 +574,46 @@ export class QuestionService {
         },
       });
 
+      for (const question of questions) {
+        if (question.file_url) {
+          question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
+        }
+      }
+
+      for (const question of questions) {
+        if (question.category.image) {
+          question.category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + question.category.image);
+        }
+      }
+
       // Format data for export
       const exportData = questions.map(question => ({
         text: question.text,
-        category_id: question.category.id,
-        language_id: question.language.id,
-        difficulty_id: question.difficulty.id,
-        question_type_id: question.question_type.id,
+        category: {
+          id: question.category.id,
+          name: question.category.name,
+          image: question.category.image,
+          image_url: question.category['image_url'],
+        },
+        language: {
+          id: question.language.id,
+          name: question.language.name,
+          code: question.language.code,
+        },
+        difficulty: {
+          id: question.difficulty.id,
+          name: question.difficulty.name,
+        },
+        question_type: {
+          id: question.question_type.id,
+          name: question.question_type.name,
+        },
         time: question.time,
         points: question.points,
         free_bundle: question.free_bundle,
         firebase: question.firebase,
+        file_url: question.file_url,
+        question_file_url: question['question_file_url'],
         answers: question.answers.map(answer => ({
           text: answer.text,
           is_correct: answer.is_correct,

@@ -620,7 +620,7 @@ model Question {
   category_id      String // Foreign key to Category model
   language_id      String // Foreign key to Language model
   difficulty_id    String // Foreign key to Difficulty model
-  question_type_id String // Foreign key to QuestionType model
+  question_type_id String? // Foreign key to QuestionType model
   file_url         String? // Optional file upload (e.g., image, document)
   time             Int // Time limit for answering the question (in seconds)
   free_bundle      Boolean? // Whether this question is part of a free bundle (Yes/No)
@@ -632,7 +632,7 @@ model Question {
   category       Category       @relation(fields: [category_id], references: [id], onDelete: Cascade) // Relation with Category model
   language       Language       @relation(fields: [language_id], references: [id], onDelete: Cascade) // Relation with Language model
   difficulty     Difficulty     @relation(fields: [difficulty_id], references: [id], onDelete: Cascade) // Relation with Difficulty model
-  question_type  QuestionType   @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
+  question_type  QuestionType?   @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
   answers        Answer[] // Related answers to the question
   player_answers PlayerAnswer[] // Game answers for this question
 

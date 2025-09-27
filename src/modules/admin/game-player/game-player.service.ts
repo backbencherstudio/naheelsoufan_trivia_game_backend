@@ -63,6 +63,7 @@ export class GamePlayerService {
                 select: {
                     id: true,
                     score: true,
+                    player_name: true,
                     correct_answers: true,
                     wrong_answers: true,
                     skipped_answers: true,
