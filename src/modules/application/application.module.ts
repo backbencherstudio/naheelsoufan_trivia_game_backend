@@ -7,6 +7,7 @@ import { GamePlayerModule } from './game-player/game-player.module';
 import { GridStyleModule } from './grid-style/grid-style.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { MultiplayerGameModule } from './multiplayer-game/multiplayer-game.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
     LeaderboardModule,
     SubscriptionModule,
     GridStyleModule,
+    MultiplayerGameModule,
   ],
 })
-export class ApplicationModule { }
+export class ApplicationModule {}
