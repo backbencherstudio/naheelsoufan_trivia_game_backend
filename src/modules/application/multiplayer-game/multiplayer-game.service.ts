@@ -34,6 +34,11 @@ export class MultiplayerGameService {
         },
       });
 
+      const hostUser = await this.prisma.user.findUnique({
+        where: { id: hostId },
+        select: { name: true },
+      });
+
       // const nanoid = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6);
       // const roomCode = nanoid();
       // const roomCode = cuid().substring(19).toUpperCase();
@@ -61,6 +66,7 @@ export class MultiplayerGameService {
           user_id: hostId,
           player_order: 1,
           status: 'ACTIVE',
+          player_name: hostUser.name,
         },
         include: {
           user: { select: { id: true, name: true, avatar: true } },
@@ -86,39 +92,42 @@ export class MultiplayerGameService {
     updateDto: UpdateRoomDto,
     userId: string,
   ) {
-    const room = await this.prisma.room.findUnique({
-      where: { id: roomId },
-    });
+    try {
+      const room = await this.prisma.room.findUnique({
+        where: { id: roomId },
+      });
+      if (!room) {
+        throw new NotFoundException('Room not found.');
+      }
 
-    if (!room) {
-      throw new NotFoundException('Room not found.');
+      if (room.host_id !== userId) {
+        throw new ForbiddenException(
+          'Only the host can update the room details.',
+        );
+      }
+
+      if (room.status !== 'WAITING') {
+        throw new BadRequestException(
+          'Cannot update details for a game that is in progress or completed.',
+        );
+      }
+
+      const updatedRoom = await this.prisma.room.update({
+        where: { id: roomId, host_id: room.host_id },
+        data: {
+          name: updateDto.name,
+          scheduled_at: updateDto.scheduled_at,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Room details updated successfully.',
+        data: updatedRoom,
+      };
+    } catch (error) {
+      console.log(error);
     }
-
-    if (room.host_id !== userId) {
-      throw new ForbiddenException(
-        'Only the host can update the room details.',
-      );
-    }
-
-    if (room.status !== 'WAITING') {
-      throw new BadRequestException(
-        'Cannot update details for a game that is in progress or completed.',
-      );
-    }
-
-    const updatedRoom = await this.prisma.room.update({
-      where: { id: roomId },
-      data: {
-        name: updateDto.name,
-        scheduled_at: updateDto.scheduled_at,
-      },
-    });
-
-    return {
-      success: true,
-      message: 'Room details updated successfully.',
-      data: updatedRoom,
-    };
   }
 
   /**
@@ -198,6 +207,14 @@ export class MultiplayerGameService {
     }
 
     try {
+      const joiningUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true },
+      });
+
+      if (!joiningUser) {
+        throw new NotFoundException('Joining user not found.');
+      }
       const newPlayer = await this.prisma.gamePlayer.create({
         data: {
           game_id: gameId,
@@ -205,6 +222,7 @@ export class MultiplayerGameService {
           user_id: userId,
           player_order: room._count.game_players + 1,
           status: 'ACTIVE',
+          player_name: joiningUser.name,
         },
         include: {
           user: { select: { id: true, name: true, avatar: true } },
