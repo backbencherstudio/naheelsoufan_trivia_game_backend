@@ -55,6 +55,7 @@ import {
 } from './dto/quick-game.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { QuestionTimeoutDto } from './dto/question-timeout.dto';
 
 @ApiTags('Game Player')
 @Controller('game-players')
@@ -112,6 +113,7 @@ export class GamePlayerController {
     }
   }
 
+  // Incomplete || not verified user
   @ApiOperation({ summary: 'Get all players in a game' })
   @Get('game/:gameId')
   async getGamePlayers(@Param('gameId') gameId: string) {
@@ -604,16 +606,20 @@ export class GamePlayerController {
     }
   }
 
+  // add player and start game
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Add multiple players to Quick Game at once' })
   @Post('quick-game/add-multiple-players')
   async addMultipleQuickGamePlayers(
     @Body() dto: AddMultipleQuickGamePlayersDto,
+    @Req() req: any,
   ) {
     try {
+      const userId = req.user.userId;
       return await this.gamePlayerService.addMultipleQuickGamePlayers(
         dto.game_id,
         dto.player_names,
+        userId,
       );
     } catch (error) {
       return {
@@ -623,24 +629,24 @@ export class GamePlayerController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({
-    summary: 'Add multiple players and start Quick Game immediately',
-  })
-  @Post('quick-game/add-players-and-start')
-  async addPlayersAndStartQuickGame(@Body() dto: AddPlayersAndStartGameDto) {
-    try {
-      return await this.gamePlayerService.addPlayersAndStartQuickGame(
-        dto.game_id,
-        dto.player_names,
-      );
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
+  // @UseGuards(JwtAuthGuard)
+  // @ApiOperation({
+  //   summary: 'Add multiple players and start Quick Game immediately',
+  // })
+  // @Post('quick-game/add-players-and-start')
+  // async addPlayersAndStartQuickGame(@Body() dto: AddPlayersAndStartGameDto) {
+  //   try {
+  //     return await this.gamePlayerService.addPlayersAndStartQuickGame(
+  //       dto.game_id,
+  //       dto.player_names,
+  //     );
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: error.message,
+  //     };
+  //   }
+  // }
 
   // ===== COMPETITIVE QUICK GAME ENDPOINTS =====
 
@@ -678,6 +684,7 @@ export class GamePlayerController {
     }
   }
 
+  // steal question/ player specific question || I think no neded
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get next question for competitive game' })
   @Get('competitive-quick-game/question/:gameId')
@@ -692,6 +699,7 @@ export class GamePlayerController {
     }
   }
 
+  // play game with selected player|| now not select player
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Answer question in competitive game' })
   @Post('competitive-quick-game/answer')
@@ -704,6 +712,35 @@ export class GamePlayerController {
         dto.player_id,
       );
     } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // for time out or quit game
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('timeout-skiped')
+  @ApiOperation({ summary: 'Handle a question timeout' })
+  async handleQuestionTimeout(
+    @Body() timeoutDto: QuestionTimeoutDto,
+    @Req() req: any,
+  ) {
+    try {
+      // টোকেন থেকে আসা userId এবং DTO থেকে আসা playerId একই কিনা তা নিশ্চিত করা যেতে পারে (ঐচ্ছিক নিরাপত্তা স্তর)
+      // const requestingUserId = req.user.userId;
+      // এখানে আরও লজিক যোগ করা যেতে পারে যে, শুধুমাত্র গেমের হোস্ট বা বর্তমান প্লেয়ারই এই কল করতে পারবে।
+      // আপাতত, আমরা ধরে নিচ্ছি যেকোনো অথেনটিকেটেড ইউজার এটি করতে পারে।
+
+      return await this.gamePlayerService.handleQuestionTimeout(
+        timeoutDto.game_id,
+        timeoutDto.player_id,
+        timeoutDto.question_id,
+      );
+    } catch (error) {
+      // সাধারণ এরর হ্যান্ডলিং
       return {
         success: false,
         message: error.message,
@@ -882,22 +919,24 @@ export class GamePlayerController {
 
   // ===== QUICK GAME FLOW ENDPOINTS =====
 
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Add players only (don't start game)" })
-  @Post('quick-game/add-players')
-  async addPlayersOnly(@Body() dto: AddPlayersOnlyDto) {
-    try {
-      return await this.gamePlayerService.addPlayersOnly(
-        dto.game_id,
-        dto.player_names,
-      );
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
+  // eta pore dekhte hobe, abadoto lagche na dekhe coment kore rakhchi
+
+  // @UseGuards(JwtAuthGuard)
+  // @ApiOperation({ summary: "Add players only (don't start game)" })
+  // @Post('quick-game/add-players')
+  // async addPlayersOnly(@Body() dto: AddPlayersOnlyDto) {
+  //   try {
+  //     return await this.gamePlayerService.addPlayersOnly(
+  //       dto.game_id,
+  //       dto.player_names,
+  //     );
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: error.message,
+  //     };
+  //   }
+  // }
 
   @UseGuards(JwtAuthGuard)
   @ApiOperation({

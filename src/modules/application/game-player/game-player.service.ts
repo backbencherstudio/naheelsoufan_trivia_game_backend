@@ -328,6 +328,7 @@ export class GamePlayerService {
   // Leave a game
   async leaveGame(userId: string, leaveGameDto: LeaveGameDto) {
     try {
+      // Its for multiplayer game
       const gamePlayer = await this.prisma.gamePlayer.findFirst({
         where: {
           game_id: leaveGameDto.game_id,
@@ -338,10 +339,12 @@ export class GamePlayerService {
       if (!gamePlayer) {
         throw new NotFoundException('Player not found in this game');
       }
-
-      await this.prisma.gamePlayer.delete({
-        where: { id: gamePlayer.id },
-      });
+      // eta single mobile play er jonno
+      if (gamePlayer) {
+        await this.prisma.gamePlayer.deleteMany({
+          where: { user_id: gamePlayer.user_id },
+        });
+      }
 
       // Game player count is automatically managed by the relation
 
@@ -2433,6 +2436,7 @@ export class GamePlayerService {
   async addMultipleQuickGamePlayers(
     gameId: string,
     playerNames: string[],
+    userId?: string,
     isMaxLimit?: number,
   ) {
     try {
@@ -2517,6 +2521,7 @@ export class GamePlayerService {
               player_order: playerOrder,
               is_guest: true,
               score: 0,
+              user_id: userId,
               correct_answers: 0,
               wrong_answers: 0,
               skipped_answers: 0,
@@ -2552,42 +2557,42 @@ export class GamePlayerService {
   /**
    * Add multiple players and start the game immediately
    */
-  async addPlayersAndStartQuickGame(gameId: string, playerNames: string[]) {
-    try {
-      // First add all players
-      const addResult = await this.addMultipleQuickGamePlayers(
-        gameId,
-        playerNames,
-      );
+  // async addPlayersAndStartQuickGame(gameId: string, playerNames: string[]) {
+  //   try {
+  //     // First add all players
+  //     const addResult = await this.addMultipleQuickGamePlayers(
+  //       gameId,
+  //       playerNames,
+  //     );
 
-      if (!addResult.success) {
-        return addResult;
-      }
+  //     if (!addResult.success) {
+  //       return addResult;
+  //     }
 
-      // Then start the game
-      const startResult = await this.startQuickGame(gameId);
+  //     // Then start the game
+  //     const startResult = await this.startQuickGame(gameId);
 
-      if (!startResult.success) {
-        return startResult;
-      }
+  //     if (!startResult.success) {
+  //       return startResult;
+  //     }
 
-      return {
-        success: true,
-        message: `Successfully added ${playerNames.length} players and started Quick Game`,
-        data: {
-          players_added: addResult.data.players,
-          game_started: startResult.data,
-          total_players: addResult.data.total_players,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Error adding players and starting game: ${error.message}`,
-        data: null,
-      };
-    }
-  }
+  //     return {
+  //       success: true,
+  //       message: `Successfully added ${playerNames.length} players and started Quick Game`,
+  //       data: {
+  //         players_added: addResult.data.players,
+  //         game_started: startResult.data,
+  //         total_players: addResult.data.total_players,
+  //       },
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: `Error adding players and starting game: ${error.message}`,
+  //       data: null,
+  //     };
+  //   }
+  // }
 
   // ===== COMPETITIVE QUICK GAME METHODS =====
 
@@ -2921,119 +2926,485 @@ export class GamePlayerService {
   /**
    * Answer question in competitive game
    */
+  // async answerCompetitiveQuestion(
+  //   gameId: string,
+  //   questionId: string,
+  //   answerId: string,
+  //   playerId: string, // যে প্লেয়ার উত্তর দিচ্ছে তার GamePlayer ID
+  // ) {
+  //   try {
+  //     // ধাপ ১: গেম, এর প্লেয়ার এবং বর্তমান অবস্থা নিয়ে আসা
+  //     const game = await this.prisma.game.findUnique({
+  //       where: { id: gameId },
+  //       include: {
+  //         game_players: {
+  //           orderBy: { player_order: 'asc' }, // প্লেয়ারদের অর্ডার অনুযায়ী সাজানো গুরুত্বপূর্ণ
+  //         },
+  //       },
+  //     });
+
+  //     if (!game) {
+  //       throw new NotFoundException('Game not found');
+  //     }
+
+  //     // ধাপ ২: টার্ন ভেরিফিকেশন (সবচেয়ে গুরুত্বপূর্ণ নতুন চেক)
+  //     if (game.current_player_id !== playerId) {
+  //       const currentPlayer = game.game_players.find(
+  //         (p) => p.id === game.current_player_id,
+  //       );
+  //       const currentTurnPlayerName =
+  //         currentPlayer?.player_name || 'the current player';
+  //       throw new ForbiddenException(
+  //         `It's not your turn! Waiting for ${currentTurnPlayerName} to answer.`,
+  //       );
+  //     }
+
+  //     // ধাপ ৩: উত্তর যাচাই করার জন্য প্রয়োজনীয় তথ্য নিয়ে আসা
+  //     const [player, question] = await Promise.all([
+  //       this.prisma.gamePlayer.findUnique({ where: { id: playerId } }),
+  //       this.prisma.question.findUnique({
+  //         where: { id: questionId },
+  //         include: { answers: true },
+  //       }),
+  //     ]);
+
+  //     if (!player) {
+  //       throw new NotFoundException(
+  //         `Player with ID ${playerId} not found in this game.`,
+  //       );
+  //     }
+  //     if (!question) {
+  //       throw new NotFoundException('Question not found');
+  //     }
+
+  //     const selectedAnswer = question.answers.find((a) => a.id === answerId);
+  //     if (!selectedAnswer) {
+  //       throw new BadRequestException('Invalid answer selected');
+  //     }
+
+  //     // ধাপ ৪: প্লেয়ারের উত্তর ডাটাবেসে রেকর্ড করা
+  //     await this.prisma.playerAnswer.create({
+  //       data: {
+  //         game_player_id: playerId,
+  //         question_id: questionId,
+  //         answer_id: answerId,
+  //         isCorrect: selectedAnswer.is_correct,
+  //       },
+  //     });
+
+  //     const isCorrect = selectedAnswer.is_correct;
+  //     const pointsEarned = isCorrect ? question.points : 0;
+
+  //     // ধাপ ৫: প্লেয়ারের স্কোর এবং পরিসংখ্যান আপডেট করা
+  //     const updatedPlayer = await this.prisma.gamePlayer.update({
+  //       where: { id: playerId },
+  //       data: {
+  //         score: { increment: pointsEarned },
+  //         ...(isCorrect
+  //           ? { correct_answers: { increment: 1 } }
+  //           : { wrong_answers: { increment: 1 } }),
+  //       },
+  //     });
+
+  //     // ধাপ ৬: পরবর্তী পদক্ষেপ নির্ধারণ করা (মূল নতুন লজিক)
+  //     if (isCorrect) {
+  //       // --- উত্তর সঠিক হলে ---
+  //       // খেলা পরবর্তী রাউন্ডের জন্য প্রস্তুত। `current_player_id` null করে দেওয়া যেতে পারে,
+  //       // যাতে `selectSingleQuestionForGame` পরবর্তী প্লেয়ারকে নির্বাচন করতে পারে।
+  //       await this.prisma.game.update({
+  //         where: { id: gameId },
+  //         data: {
+  //           // `current_player_id` এখানে পরিবর্তন করা হচ্ছে না।
+  //           // `selectSingleQuestionForGame` পরবর্তী টার্নে এটি করবে।
+  //           game_phase: 'ROUND_COMPLETED', // ফেজ আপডেট করা হলো
+  //         },
+  //       });
+
+  //       return {
+  //         success: true,
+  //         message: 'Correct answer! Well done.',
+  //         data: {
+  //           is_correct: true,
+  //           points_earned: pointsEarned,
+  //           player_score: updatedPlayer.score,
+  //           next_action: 'SELECT_NEW_QUESTION', // ফ্রন্টএন্ডকে বলা হলো নতুন প্রশ্ন সিলেক্ট করতে
+  //           player_id: playerId,
+  //           player_name: player.player_name,
+  //         },
+  //       };
+  //     } else {
+  //       // --- উত্তর ভুল হলে ---
+  //       // টার্ন পরবর্তী প্লেয়ারের কাছে চলে যাবে।
+  //       const currentPlayerIndex = game.game_players.findIndex(
+  //         (p) => p.id === playerId,
+  //       );
+  //       const totalPlayers = game.game_players.length;
+  //       const nextPlayerIndex = (currentPlayerIndex + 1) % totalPlayers;
+  //       const nextPlayer = game.game_players[nextPlayerIndex];
+
+  //       // গেমের টার্ন আপডেট করা
+  //       await this.prisma.game.update({
+  //         where: { id: gameId },
+  //         data: {
+  //           current_player_id: nextPlayer.id, // টার্ন পরবর্তী প্লেয়ারকে দেওয়া হলো
+  //           game_phase: 'PASS_THE_TURN', // ফেজ আপডেট করা হলো
+  //         },
+  //       });
+
+  //       return {
+  //         success: true,
+  //         message: 'Wrong answer! The turn passes to the next player.',
+  //         data: {
+  //           is_correct: false,
+  //           points_earned: 0,
+  //           player_score: updatedPlayer.score,
+  //           correct_answer: question.answers.find((a) => a.is_correct),
+  //           next_action: 'PASS_TURN_TO_NEXT_PLAYER', // ফ্রন্টএন্ডকে অ্যাকশন জানানো হলো
+  //           next_player: {
+  //             id: nextPlayer.id,
+  //             name: nextPlayer.player_name,
+  //             player_order: nextPlayer.player_order,
+  //           },
+  //           current_question: {
+  //             // ফ্রন্টএন্ডকে একই প্রশ্ন আবার দেখানোর জন্য তথ্য
+  //             id: question.id,
+  //             text: question.text,
+  //             answers: question.answers.map((a) => ({
+  //               id: a.id,
+  //               text: a.text,
+  //             })),
+  //           },
+  //         },
+  //       };
+  //     }
+  //   } catch (error) {
+  //     // স্ট্যান্ডার্ড এরর হ্যান্ডলিং
+  //     if (
+  //       error instanceof ForbiddenException ||
+  //       error instanceof NotFoundException ||
+  //       error instanceof BadRequestException
+  //     ) {
+  //       throw error;
+  //     }
+  //     console.error(`Error answering question: ${error.message}`);
+  //     throw new InternalServerErrorException(
+  //       'An unexpected error occurred while answering the question.',
+  //     );
+  //   }
+  // }
+
+  // --- সময় শেষ হওয়ার জন্য একটি নতুন সার্ভিস ফাংশন ---
+  // async handleQuestionTimeout(
+  //   gameId: string,
+  //   playerId: string,
+  //   questionId: string,
+  // ) {
+  //   try {
+  //     const game = await this.prisma.game.findUnique({
+  //       where: { id: gameId },
+  //       include: {
+  //         game_players: { orderBy: { player_order: 'asc' } },
+  //       },
+  //     });
+
+  //     if (!game) {
+  //       throw new NotFoundException('Game not found');
+  //     }
+  //     if (game.current_player_id !== playerId) {
+  //       throw new ForbiddenException(
+  //         "It's not this player's turn to time out.",
+  //       );
+  //     }
+
+  //     // প্লেয়ারের skipped_answers সংখ্যা বাড়ানো
+  //     await this.prisma.gamePlayer.update({
+  //       where: { id: playerId },
+  //       data: { skipped_answers: { increment: 1 } },
+  //     });
+
+  //     // টার্ন পরবর্তী প্লেয়ারের কাছে পাস করা
+  //     const currentPlayerIndex = game.game_players.findIndex(
+  //       (p) => p.id === playerId,
+  //     );
+  //     const totalPlayers = game.game_players.length;
+  //     const nextPlayerIndex = (currentPlayerIndex + 1) % totalPlayers;
+  //     const nextPlayer = game.game_players[nextPlayerIndex];
+
+  //     await this.prisma.game.update({
+  //       where: { id: gameId },
+  //       data: {
+  //         current_player_id: nextPlayer.id,
+  //         game_phase: 'PASS_THE_TURN_TIMEOUT',
+  //       },
+  //     });
+
+  //     return {
+  //       success: true,
+  //       message: `Time is up! The turn passes to ${nextPlayer.player_name}.`,
+  //       data: {
+  //         next_player: {
+  //           id: nextPlayer.id,
+  //           name: nextPlayer.player_name,
+  //         },
+  //       },
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: `Error selecting question: ${error.message}`,
+  //     };
+  //   }
+  // }
+
   async answerCompetitiveQuestion(
     gameId: string,
     questionId: string,
     answerId: string,
-    playerId: string,
+    playerId: string, // যে প্লেয়ার উত্তর দিচ্ছে
   ) {
     try {
       const game = await this.prisma.game.findUnique({
         where: { id: gameId },
-        include: {
-          game_players: {
-            include: { user: true },
+        include: { game_players: { orderBy: { player_order: 'asc' } } },
+      });
+
+      if (!game) throw new NotFoundException('Game not found');
+
+      // --- নতুন এবং উন্নত টার্ন ভেরিফিকেশন ---
+      const isStealMode = game.current_player_id === null;
+
+      if (isStealMode) {
+        // --- স্টিল মোডের জন্য বিশেষ চেক ---
+        // ধাপ ১: এই প্রশ্নের সকল উত্তরদাতাদের খুঁজে বের করা
+        const answerers = await this.prisma.playerAnswer.findMany({
+          where: {
+            question_id: questionId,
           },
-        },
-      });
+          orderBy: {
+            created_at: 'asc',
+          },
+        });
 
-      if (!game) {
-        throw new NotFoundException('Game not found');
+        // ধাপ ২: বর্তমান প্লেয়ার আগে উত্তর দিয়েছে কিনা তা পরীক্ষা করা
+        if (answerers.some((answer) => answer.game_player_id === playerId)) {
+          throw new ForbiddenException(
+            'You have already attempted to answer this question and cannot try again.',
+          );
+        }
+      } else {
+        // --- নরমাল টার্ন ভেরিফিকেশন ---
+        if (game.current_player_id !== playerId) {
+          const currentPlayer = game.game_players.find(
+            (p) => p.id === game.current_player_id,
+          );
+          const currentTurnPlayerName =
+            currentPlayer?.player_name || 'the current player';
+          throw new ForbiddenException(
+            `It's not your turn! Waiting for ${currentTurnPlayerName} to answer.`,
+          );
+        }
       }
+      // --- টার্ন ভেরিফিকেশন শেষ ---
 
-      const player = game.game_players.find((p) => p.id === playerId);
-      if (!player) {
-        // Debug information to help identify the issue
-        const availablePlayerIds = game.game_players.map((p) => p.id);
-        const availablePlayerNames = game.game_players.map(
-          (p) => p.player_name || p.user?.name || 'Unknown',
-        );
+      const [player, question] = await Promise.all([
+        this.prisma.gamePlayer.findUnique({ where: { id: playerId } }),
+        this.prisma.question.findUnique({
+          where: { id: questionId },
+          include: { answers: true },
+        }),
+      ]);
 
-        throw new NotFoundException(
-          `Player not found in this game. ` +
-            `Looking for player ID: ${playerId}. ` +
-            `Available players: ${availablePlayerIds.join(', ')} ` +
-            `(${availablePlayerNames.join(', ')})`,
-        );
-      }
-
-      // Get question with correct answer
-      const question = await this.prisma.question.findUnique({
-        where: { id: questionId },
-        include: { answers: true },
-      });
-
-      if (!question) {
-        throw new NotFoundException('Question not found');
-      }
+      if (!player || !question)
+        throw new NotFoundException('Player or Question not found.');
 
       const selectedAnswer = question.answers.find((a) => a.id === answerId);
-      if (!selectedAnswer) {
+      if (!selectedAnswer)
         throw new BadRequestException('Invalid answer selected');
-      }
-
-      // Check if already answered by this player
-      const existingAnswer = await this.prisma.playerAnswer.findFirst({
-        where: {
-          game_player_id: playerId,
-          question_id: questionId,
-        },
-      });
-
-      if (existingAnswer) {
-        throw new BadRequestException(
-          'Question already answered by this player',
-        );
-      }
-
-      // Create player answer
-      await this.prisma.playerAnswer.create({
-        data: {
-          game_player_id: playerId,
-          question_id: questionId,
-          answer_id: answerId,
-          isCorrect: selectedAnswer.is_correct,
-        },
-      });
 
       const isCorrect = selectedAnswer.is_correct;
-      const pointsEarned = isCorrect ? question.points : 0;
+      const pointsEarned = isCorrect
+        ? isStealMode
+          ? Math.round(question.points / 2) // অর্ধেক পয়েন্ট, রাউন্ড করে
+          : question.points
+        : 0;
 
-      // Update player stats
-      const updatedPlayer = await this.prisma.gamePlayer.update({
+      // প্লেয়ারের উত্তর এবং স্কোর আপডেট
+      await this.prisma.$transaction([
+        this.prisma.playerAnswer.create({
+          data: {
+            game_player_id: playerId,
+            question_id: questionId,
+            answer_id: answerId,
+            isCorrect,
+          },
+        }),
+        this.prisma.gamePlayer.update({
+          where: { id: playerId },
+          data: {
+            score: { increment: pointsEarned },
+            ...(isCorrect
+              ? { correct_answers: { increment: 1 } }
+              : { wrong_answers: { increment: 1 } }),
+          },
+        }),
+      ]);
+
+      // আপডেটেড প্লেয়ারের স্কোর নিয়ে আসা
+      const updatedPlayer = await this.prisma.gamePlayer.findUnique({
         where: { id: playerId },
+      });
+
+      if (isCorrect) {
+        // --- উত্তর সঠিক হলে (Normal বা Steal উভয় ক্ষেত্রেই) ---
+        await this.prisma.game.update({
+          where: { id: gameId },
+          data: { game_phase: 'ROUND_COMPLETED', current_player_id: playerId }, // পরের টার্নটি বিজয়ীর
+        });
+
+        return {
+          success: true,
+          message: isStealMode
+            ? `Successful steal by ${player.player_name}!`
+            : 'Correct answer!',
+          data: {
+            is_correct: true,
+            is_steal: isStealMode,
+            points_earned: pointsEarned,
+            player_score: updatedPlayer.score,
+            next_action: 'SELECT_NEW_QUESTION',
+            player_id: playerId,
+            player_name: player.player_name,
+          },
+        };
+      } else {
+        // --- উত্তর ভুল হলে ---
+        if (isStealMode) {
+          // যদি Steal করার সময়ও ভুল উত্তর দেয়, তাহলে প্রশ্নটি বাতিল হয়ে যাবে।
+          // এবং যার টার্ন ছিল, তার পরবর্তী প্লেয়ার নতুন প্রশ্ন পাবে।
+          const firstAnswerer = await this.prisma.playerAnswer.findFirst({
+            where: { question_id: questionId },
+            orderBy: { created_at: 'asc' },
+          });
+
+          const originalPlayer = game.game_players.find(
+            (p) => p.id === firstAnswerer.game_player_id,
+          );
+          const originalPlayerIndex = game.game_players.findIndex(
+            (p) => p.id === originalPlayer.id,
+          );
+          const nextPlayerForNewQuestion =
+            game.game_players[
+              (originalPlayerIndex + 1) % game.game_players.length
+            ];
+
+          await this.prisma.game.update({
+            where: { id: gameId },
+            data: {
+              game_phase: 'ROUND_COMPLETED',
+              current_player_id: nextPlayerForNewQuestion.id,
+            },
+          });
+
+          return {
+            success: true,
+            message: 'Incorrect steal attempt. Moving to the next round.',
+            data: {
+              is_correct: false,
+              is_steal: true,
+              player_score: updatedPlayer.score,
+              next_action: 'SELECT_NEW_QUESTION_FOR_NEXT_PLAYER',
+              next_player_id: nextPlayerForNewQuestion.id,
+            },
+          };
+        } else {
+          // যদি Normal টার্নে ভুল উত্তর দেয়, তাহলে Steal Mode চালু হবে
+          await this.prisma.game.update({
+            where: { id: gameId },
+            data: { current_player_id: null, game_phase: 'STEAL_MODE_ACTIVE' },
+          });
+
+          return {
+            success: true,
+            message: `Wrong answer! The question is now open for anyone to steal.`,
+            data: {
+              is_correct: false,
+              player_score: updatedPlayer.score,
+              next_action: 'OPEN_FOR_STEAL',
+              current_question: {
+                id: question.id,
+                text: question.text,
+                answers: question.answers.map((a) => ({
+                  id: a.id,
+                  text: a.text,
+                })),
+              },
+            },
+          };
+        }
+      }
+    } catch (error) {
+      if (
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      console.error(`Error answering question: ${error.message}`);
+      throw new InternalServerErrorException(
+        'An unexpected error occurred while answering the question.',
+      );
+    }
+  }
+
+  async handleQuestionTimeout(
+    gameId: string,
+    playerId: string,
+    questionId: string,
+  ) {
+    try {
+      const game = await this.prisma.game.findUnique({
+        where: { id: gameId },
+        include: { game_players: { orderBy: { player_order: 'asc' } } },
+      });
+
+      if (!game) throw new NotFoundException('Game not found');
+      if (game.current_player_id !== playerId)
+        throw new ForbiddenException(
+          "It's not this player's turn to time out.",
+        );
+
+      // প্লেয়ারের skipped_answers সংখ্যা বাড়ানো
+      await this.prisma.gamePlayer.update({
+        where: { id: playerId },
+        data: { skipped_answers: { increment: 1 } },
+      });
+
+      // --- নতুন লজিক: Steal Mode চালু করা ---
+      await this.prisma.game.update({
+        where: { id: gameId },
         data: {
-          score: { increment: pointsEarned },
-          ...(isCorrect
-            ? { correct_answers: { increment: 1 } }
-            : { wrong_answers: { increment: 1 } }),
+          current_player_id: null, // <-- null করে দেওয়া হলো
+          game_phase: 'STEAL_MODE_ON_TIMEOUT',
         },
       });
 
       return {
         success: true,
-        message: isCorrect ? 'Correct answer!' : 'Wrong answer!',
+        message: `Time is up! The question is now open for anyone to steal.`,
         data: {
-          is_correct: isCorrect,
-          points_earned: pointsEarned,
-          player_score: updatedPlayer.score,
-          correct_answer: isCorrect
-            ? null
-            : question.answers.find((a) => a.is_correct),
-          player_id: playerId,
-          player_name: player.player_name || player.user?.name || 'Unknown',
-          game_continues: true,
+          next_action: 'OPEN_FOR_STEAL',
+          // ফ্রন্টএন্ডকে প্রশ্নটি আবার দেখাতে হবে
+          question_id: questionId,
         },
       };
     } catch (error) {
       return {
         success: false,
-        message: `Error answering question: ${error.message}`,
-        data: null,
+        message: `Error selecting question: ${error.message}`,
       };
     }
   }
-
   /**
    * Get player IDs for a game (helper method for debugging)
    */
@@ -3734,37 +4105,38 @@ export class GamePlayerService {
   /**
    * Add players only (don't start game)
    */
-  async addPlayersOnly(gameId: string, playerNames: string[]) {
-    try {
-      // Use existing addMultipleQuickGamePlayers method but don't start game
-      return await this.addMultipleQuickGamePlayers(gameId, playerNames);
-    } catch (error) {
-      return {
-        success: false,
-        message: `Error adding players: ${error.message}`,
-        data: null,
-      };
-    }
-  }
+  // async addPlayersOnly(gameId: string, playerNames: string[]) {
+  //   try {
+  //     // Use existing addMultipleQuickGamePlayers method but don't start game
+  //     return await this.addMultipleQuickGamePlayers(gameId, playerNames, userId);
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: `Error adding players: ${error.message}`,
+  //       data: null,
+  //     };
+  //   }
+  // }
 
   /**
    * Select category/difficulty and start game in one step
    */
+  // multiplayer-game.service.ts
+
   async selectSingleQuestionForGame(
     gameId: string,
     categoryId: string,
     difficultyId: string,
   ) {
     try {
-      // Step 1: Fetch the game
+      // ধাপ ১: গেম এবং এর বর্তমান অবস্থা বিস্তারিতভাবে নিয়ে আসা
       const game = await this.prisma.game.findUnique({
         where: { id: gameId },
         include: {
           game_players: {
-            include: { user: true },
-            orderBy: { player_order: 'asc' },
+            orderBy: { player_order: 'asc' }, // প্লেয়ারদেরকে তাদের অর্ডার অনুযায়ী সাজানো
           },
-          game_questions: true, // Already generated questions
+          game_questions: true,
         },
       });
 
@@ -3772,11 +4144,32 @@ export class GamePlayerService {
         throw new NotFoundException('Game not found');
       }
 
-      if (game.game_players.length < 2) {
-        throw new BadRequestException('Need at least 2 players to start game');
+      if (game.game_players.length === 0) {
+        // প্লেয়ার ছাড়া খেলা সম্ভব নয়
+        throw new BadRequestException(
+          'No players have been added to this game yet.',
+        );
       }
 
-      // Step 2: Fetch all questions for this category/difficulty
+      // ধাপ ২: পরবর্তী প্লেয়ার কে হবে তা নির্ধারণ করা
+      let currentPlayer;
+      const totalPlayers = game.game_players.length;
+
+      if (game.current_player_id === null) {
+        // যদি এটি গেমের প্রথম প্রশ্ন হয়
+        currentPlayer = game.game_players[0]; // প্রথম প্লেয়ারকে নির্বাচন করা হলো
+      } else {
+        // যদি খেলা চলতে থাকে
+        const lastPlayerIndex = game.game_players.findIndex(
+          (p) => p.id === game.current_player_id,
+        );
+
+        // পরবর্তী প্লেয়ারকে নির্বাচন করা (চক্রাকারে)
+        const nextPlayerIndex = (lastPlayerIndex + 1) % totalPlayers;
+        currentPlayer = game.game_players[nextPlayerIndex];
+      }
+
+      // --- প্রশ্ন খোঁজা এবং নির্বাচন করার লজিক (আপনার আগের কোড) ---
       const allQuestions = await this.prisma.question.findMany({
         where: {
           category_id: categoryId,
@@ -3785,6 +4178,9 @@ export class GamePlayerService {
         include: {
           answers: {
             select: { id: true, text: true, file_url: true },
+          },
+          question_type: {
+            select: { id: true, name: true },
           },
         },
       });
@@ -3795,7 +4191,6 @@ export class GamePlayerService {
         );
       }
 
-      // Step 3: Filter out already used questions in this game
       const usedQuestionIds = game.game_questions.map((q) => q.question_id);
       const availableQuestions = allQuestions.filter(
         (q) => !usedQuestionIds.includes(q.id),
@@ -3807,36 +4202,61 @@ export class GamePlayerService {
         );
       }
 
-      // Step 4: Randomly pick 1 question
       const selectedQuestion =
         availableQuestions[
           Math.floor(Math.random() * availableQuestions.length)
         ];
+      // --- প্রশ্ন নির্বাচন শেষ ---
 
-      // Step 5: Insert into GameQuestion to mark as used
-      await this.prisma.gameQuestion.create({
-        data: {
-          game_id: gameId,
-          question_id: selectedQuestion.id,
-        },
-      });
+      // ধাপ ৩: গেমের অবস্থা ডাটাবেসে আপডেট করা
+      await this.prisma.$transaction([
+        // প্রশ্নটিকে "ব্যবহৃত" হিসেবে চিহ্নিত করা
+        this.prisma.gameQuestion.create({
+          data: {
+            game_id: gameId,
+            question_id: selectedQuestion.id,
+          },
+        }),
 
-      // Step 6: Return question data
+        // ekhane nicher ta uncomment kore dite hobe.
+        this.prisma.game.update({
+          where: { id: gameId },
+          data: {
+            game_phase: 'QUESTION_SELECTED',
+            current_player_id: currentPlayer.id,
+            current_question: game.current_question + 1,
+            // question_asked_at: new Date(),
+          },
+        }),
+      ]);
+
+      // ধাপ ৪: চূড়ান্ত রেসপন্স তৈরি করা
+      const formattedQuestion = {
+        id: selectedQuestion.id,
+        text: selectedQuestion.text,
+        points: selectedQuestion.points,
+        time_limit: selectedQuestion.time,
+        file_url: selectedQuestion.file_url,
+        question_type: selectedQuestion.question_type,
+        answers: selectedQuestion.answers.map((a) => ({
+          id: a.id,
+          text: a.text,
+          file_url: a.file_url,
+        })),
+      };
+
       return {
         success: true,
-        message: 'Question selected successfully',
+        message: `Question selected for ${currentPlayer.player_name}. It's their turn to answer.`,
         data: {
-          question: {
-            id: selectedQuestion.id,
-            text: selectedQuestion.text,
-            points: selectedQuestion.points,
-            time_limit: selectedQuestion.time,
-            file_url: selectedQuestion.file_url,
-            answers: selectedQuestion.answers.map((a) => ({
-              id: a.id,
-              text: a.text,
-              file_url: a.file_url,
-            })),
+          question: formattedQuestion,
+          currentPlayer: {
+            id: currentPlayer.id,
+            name: currentPlayer.player_name,
+            player_order: currentPlayer.player_order,
+          },
+          game_info: {
+            current_question_number: game.current_question + 1,
           },
         },
       };

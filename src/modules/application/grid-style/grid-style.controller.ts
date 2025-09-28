@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
@@ -55,11 +56,14 @@ export class GridStyleController {
   @Post('add-players')
   async addMultipleQuickGamePlayers(
     @Body() dto: AddMultipleQuickGamePlayersDto,
+    @Req() req: any,
   ) {
     try {
+      const userId = req.user.userId;
       return await this.gameService.addMultipleQuickGamePlayers(
         dto.game_id,
         dto.player_names,
+        userId,
         2,
       );
     } catch (error) {
