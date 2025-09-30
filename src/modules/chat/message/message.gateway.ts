@@ -299,4 +299,9 @@ export class MessageGateway
     this.server.to(roomId).emit('roomUpdated', roomInfo);
     console.log(`Emitted roomUpdated event to room ${roomId}`);
   }
+  // ...
+  emitNewQuestionForMultiplayer(roomId: string, data: any) {
+    this.server.to(roomId).emit('newQuestionReady', data);
+    console.log(`Emitted newQuestionReady event to room ${roomId}`);
+  }
 }
