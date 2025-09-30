@@ -566,6 +566,7 @@ model Leaderboard {
   game         Game?     @relation(fields: [game_id], references: [id], onDelete: Cascade)
   user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@unique([user_id, game_id])
   @@map("leaderboards")
 }
 
