@@ -23,6 +23,8 @@ import { Role } from '../../../common/guard/role/role.enum';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Category')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 @Controller('admin/categories')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) { }
@@ -54,6 +56,45 @@ export class CategoryController {
       return {
         success: false,
         message: error.message,  // Return error message if fetching fails
+      };
+    }
+  }
+
+  @ApiOperation({ summary: 'Import categories from file' })
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file'))
+  async importCategories(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    try {
+      if (!file) {
+        return {
+          success: false,
+          message: 'No file uploaded',
+        };
+      }
+
+      const result = await this.categoryService.importCategories(file);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @ApiOperation({ summary: 'Export all categories' })
+  @Get('export')
+  async exportCategories() {
+    try {
+      const result = await this.categoryService.exportCategories();
+      return result.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
       };
     }
   }
