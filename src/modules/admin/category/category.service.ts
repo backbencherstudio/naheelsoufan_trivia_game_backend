@@ -42,7 +42,7 @@ export class CategoryService {
       });
 
       if (category && category.image) {
-        category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+        category['image'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
       }
 
       return {
@@ -106,7 +106,7 @@ export class CategoryService {
       // Add image URLs if the image is available
       for (const category of categories) {
         if (category.image) {
-          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+          category['image'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
         }
       }
 
@@ -170,7 +170,7 @@ export class CategoryService {
       });
 
       if (category && category.image) {
-        category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+        category['image'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
       }
 
       return {
@@ -224,7 +224,7 @@ export class CategoryService {
       });
 
       if (updatedCategory && updatedCategory.image) {
-        updatedCategory['image_url'] = SojebStorage.url(appConfig().storageUrl.category + updatedCategory.image);
+        updatedCategory['image'] = SojebStorage.url(appConfig().storageUrl.category + updatedCategory.image);
       }
 
       return {
@@ -269,6 +269,131 @@ export class CategoryService {
       return {
         success: false,
         message: `Error deleting category: ${error.message}`,
+      };
+    }
+  }
+
+  // Import categories from uploaded file
+  async importCategories(file: Express.Multer.File) {
+    try {
+      // Validate file type
+      if (!file.mimetype.includes('json') && !file.originalname.endsWith('.json')) {
+        throw new Error('Only JSON files are allowed for category import');
+      }
+
+      // Parse JSON content
+      let categoriesData;
+      try {
+        const fileContent = file.buffer.toString('utf8');
+        categoriesData = JSON.parse(fileContent);
+      } catch (jsonError) {
+        throw new Error('Invalid JSON file format');
+      }
+
+      // Validate JSON structure
+      if (!Array.isArray(categoriesData)) {
+        throw new Error('JSON file must contain an array of categories');
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      // Process each category
+      for (let i = 0; i < categoriesData.length; i++) {
+        const categoryData = categoriesData[i];
+
+        try {
+          // Validate required fields
+          if (!categoryData.name || !categoryData.language.id) {
+            throw new Error(`Missing required fields in category ${i + 1}`);
+          }
+
+          // Create category
+          await this.prisma.category.create({
+            data: {
+              name: categoryData.name,
+              language_id: categoryData.language.id,
+              image: categoryData.image || null,
+            },
+          });
+
+          successCount++;
+        } catch (categoryError) {
+          errorCount++;
+          errors.push(`Category ${i + 1}: ${categoryError.message}`);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Import completed: ${successCount} categories imported successfully, ${errorCount} failed`,
+        data: {
+          total_processed: categoriesData.length,
+          successful: successCount,
+          failed: errorCount,
+          errors: errors,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error importing categories: ${error.message}`,
+      };
+    }
+  }
+
+  // Export all categories
+  async exportCategories() {
+    try {
+      const categories = await this.prisma.category.findMany({
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          created_at: true,
+          updated_at: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      // Add image URLs if available
+      for (const category of categories) {
+        if (category.image) {
+          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+        }
+      }
+
+      // Format data for export
+      const exportData = categories.map(category => ({
+        name: category.name,
+        image: category.image,
+        image_url: category['image_url'],
+        language: {
+          id: category.language.id,
+          name: category.language.name,
+          code: category.language.code,
+        },
+      }));
+
+      return {
+        success: true,
+        message: `${categories.length} categories exported successfully`,
+        data: exportData,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error exporting categories: ${error.message}`,
       };
     }
   }

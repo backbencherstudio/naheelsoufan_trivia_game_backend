@@ -1,146 +1,45 @@
 [
   {
-    "text": "What is the capital of France?",
-    "category_id": "cmei5s7rm0007wseobs2vdf4s",
-    "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
-    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 45,
+    "text": "Consequatur pariatur",
+    "category": {
+      "id": "cmei5s7rm0007wseobs2vdf4s",
+      "name": "Basic Question",
+      "image": "https://nirob.signalsmind.com/s3/public/storage/category/3b7a2a9a551c3bb10510614d18f073839f-Capitals.jpg"
+    },
+    "language": {
+      "id": "cmee1gu4i0000wsa80neoo1x7",
+      "name": "English",
+      "code": "en"
+    },
+    "difficulty": {
+      "id": "cmee2hlw20001wsbkpf6o81l6",
+      "name": "Hard"
+    },
+    "question_type": {
+      "id": "cmee2pncu0001ws20gkdui4sv",
+      "name": "Options"
+    },
+    "time": 81,
+    "points": 50,
     "free_bundle": false,
-    "firebase": true,
-    "points": 5,
+    "firebase": null,
+    "file_url": "https://nirob.signalsmind.com/s3/public/storage/question/a7210576b3bb1b310e4f499342479eb2e6-Video_2025-04-13_105135.mp4",
     "answers": [
       {
-        "text": "Paris",
+        "text": "test",
+        "is_correct": false
+      },
+      {
+        "text": "test2",
+        "is_correct": false
+      },
+      {
+        "text": "test3",
+        "is_correct": false
+      },
+      {
+        "text": "test4",
         "is_correct": true
-      },
-      {
-        "text": "London",
-        "is_correct": false
-      },
-      {
-        "text": "Berlin",
-        "is_correct": false
-      },
-      {
-        "text": "Rome",
-        "is_correct": false
-      }
-    ]
-  },
-  {
-    "text": "What is the largest mammal in the world?",
-    "category_id": "cmei5s7rm0007wseobs2vdf4s",
-    "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
-    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 50,
-    "free_bundle": true,
-    "firebase": false,
-    "points": 6,
-    "answers": [
-      {
-        "text": "Blue Whale",
-        "is_correct": true
-      },
-      {
-        "text": "Elephant",
-        "is_correct": false
-      },
-      {
-        "text": "Giraffe",
-        "is_correct": false
-      },
-      {
-        "text": "Shark",
-        "is_correct": false
-      }
-    ]
-  },
-  {
-    "text": "What is the square root of 64?",
-    "category_id": "cmei5s7rm0007wseobs2vdf4s",
-    "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
-    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 30,
-    "free_bundle": false,
-    "firebase": true,
-    "points": 4,
-    "answers": [
-      {
-        "text": "8",
-        "is_correct": true
-      },
-      {
-        "text": "6",
-        "is_correct": false
-      },
-      {
-        "text": "10",
-        "is_correct": false
-      },
-      {
-        "text": "12",
-        "is_correct": false
-      }
-    ]
-  },
-  {
-    "text": "Who wrote the play 'Romeo and Juliet'?",
-    "category_id": "cmei5s7rm0007wseobs2vdf4s",
-    "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
-    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 60,
-    "free_bundle": true,
-    "firebase": false,
-    "points": 5,
-    "answers": [
-      {
-        "text": "William Shakespeare",
-        "is_correct": true
-      },
-      {
-        "text": "Charles Dickens",
-        "is_correct": false
-      },
-      {
-        "text": "Jane Austen",
-        "is_correct": false
-      },
-      {
-        "text": "Mark Twain",
-        "is_correct": false
-      }
-    ]
-  },
-  {
-    "text": "What is the hardest natural substance on Earth?",
-    "category_id": "cmei5s7rm0007wseobs2vdf4s",
-    "language_id": "cmee1gu4i0000wsa80neoo1x7",
-    "difficulty_id": "cmegxmkmw000dwsasvhguofjl",
-    "question_type_id": "cmee2pncu0001ws20gkdui4sv",
-    "time": 50,
-    "free_bundle": false,
-    "firebase": true,
-    "points": 7,
-    "answers": [
-      {
-        "text": "Diamond",
-        "is_correct": true
-      },
-      {
-        "text": "Gold",
-        "is_correct": false
-      },
-      {
-        "text": "Iron",
-        "is_correct": false
-      },
-      {
-        "text": "Platinum",
-        "is_correct": false
       }
     ]
   }
