@@ -44,7 +44,12 @@ export class CreateQuestionDto {
 
     @IsOptional()
     @IsBoolean()
-    @Transform(({ value }) => value === 'true' ? true : false)
+    @Transform(({ value }) => {
+        if (typeof value === 'string') {
+            return value === 'true' ? true : false;
+        }
+        return value;
+    })
     free_bundle: boolean;  // Whether this question is part of a free bundle (Yes/No)
 
     @IsOptional()
