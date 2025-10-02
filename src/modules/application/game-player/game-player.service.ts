@@ -772,7 +772,6 @@ export class GamePlayerService {
         );
       }
 
-      // Get questions from all selected categories
       const whereClause = {
         category_id: { in: questionsDto.category_ids },
         difficulty_id: questionsDto.difficulty_id,
@@ -3985,7 +3984,7 @@ export class GamePlayerService {
             orderBy: { player_order: 'asc' },
           },
           game_questions: true,
-          rooms: true, // <-- অনলাইন গেম শনাক্ত করার জন্য room প্রয়োজন
+          rooms: true,
         },
       });
 
@@ -4062,7 +4061,7 @@ export class GamePlayerService {
             game_phase: 'QUESTION_SELECTED',
             current_player_id: currentPlayer.id,
             current_question: game.current_question + 1,
-            // question_asked_at: new Date(),
+            question_asked_at: new Date(),
           },
         }),
       ]);
