@@ -451,6 +451,7 @@ model Game {
   game_phase        String        @default("waiting") // waiting, category_selection, question, completed
   total_questions   Int           @default(0) // Total questions in this game
   current_question  Int           @default(0) // Current question number
+  question_asked_at DateTime?
   // Relations
   game_players      GamePlayer[] // Players in this game
   rooms             Room[]
