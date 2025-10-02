@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { OnModuleInit } from '@nestjs/common';
-// import { MessageStatus } from '@prisma/client';
+import { MessageStatus } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -142,9 +142,12 @@ export class MessageGateway
   @SubscribeMessage('updateMessageStatus')
   async updateMessageStatus(
     client: Socket,
-    @MessageBody() body: { message_id: string; status: string },
+    @MessageBody() body: { message_id: string; status: MessageStatus },
   ) {
-    await ChatRepository.updateMessageStatus(body.message_id, body.status as any);
+    await ChatRepository.updateMessageStatus(
+      body.message_id,
+      body.status as any,
+    );
     // notify the sender that the message has been sent
     this.server.emit('messageStatusUpdated', {
       message_id: body.message_id,
@@ -275,5 +278,30 @@ export class MessageGateway
       stream.write(buffer);
       this.chunks.delete(payload.recordingId);
     }
+  }
+
+  emitPlayerJoined(roomId: string, playerInfo: any) {
+    this.server.to(roomId).emit('playerJoined', playerInfo);
+    console.log(`Emitted playerJoined event to room ${roomId}`);
+  }
+
+  emitPlayerLeft(roomId: string, playerInfo: any) {
+    this.server.to(roomId).emit('playerLeft', playerInfo);
+    console.log(`Emitted playerLeft event to room ${roomId}`);
+  }
+
+  /**
+   * Emits an event to all clients in a room when room details are updated.
+   * @param roomId The ID of the room to emit to.
+   * @param roomInfo The updated room data.
+   */
+  emitRoomUpdated(roomId: string, roomInfo: any) {
+    this.server.to(roomId).emit('roomUpdated', roomInfo);
+    console.log(`Emitted roomUpdated event to room ${roomId}`);
+  }
+  // ...
+  emitNewQuestionForMultiplayer(roomId: string, data: any) {
+    this.server.to(roomId).emit('newQuestionReady', data);
+    console.log(`Emitted newQuestionReady event to room ${roomId}`);
   }
 }

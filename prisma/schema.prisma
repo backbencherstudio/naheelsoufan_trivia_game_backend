@@ -36,7 +36,8 @@ model User {
   deleted_at                DateTime?
   status                    Int?           @default(1) @db.SmallInt
   approved_at               DateTime?
-  googleId          String?   @unique
+  apple_id                  String?        @unique
+  googleId                  String?        @unique
   availability              String?
   email                     String?        @unique
   username                  String?        @unique
@@ -455,48 +456,57 @@ model Game {
   rooms             Room[]
   leaderboards      Leaderboard[]
 
+  game_questions GameQuestion[]
+
   game_selections GameSelection[]
 
   @@map("games")
 }
 
-
 model GameSelection {
-  id             String   @id @default(cuid())
-  game_id        String
-  player_id      String   // GamePlayer ID
-  category_id    String
-  difficulty_id  String
-  points         Int      // Points for this selection
-  is_used        Boolean  @default(false)
-  created_at     DateTime @default(now())
-  
-  game           Game       @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  player         GamePlayer @relation(fields: [player_id], references: [id], onDelete: Cascade)
-  category       Category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
-  difficulty     Difficulty @relation(fields: [difficulty_id], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  game_id       String
+  player_id     String // GamePlayer ID
+  category_id   String
+  difficulty_id String
+  points        Int // Points for this selection
+  is_used       Boolean  @default(false)
+  created_at    DateTime @default(now())
+
+  game       Game       @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  player     GamePlayer @relation(fields: [player_id], references: [id], onDelete: Cascade)
+  category   Category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  difficulty Difficulty @relation(fields: [difficulty_id], references: [id], onDelete: Cascade)
 
   @@map("game_selections")
 }
 
+enum PlayerStatus {
+  ACTIVE
+  INACTIVE
+  QUIT
+  BANNED
+}
+
 model GamePlayer {
-  id              String         @id @default(cuid())
-  created_at      DateTime       @default(now())
-  updated_at      DateTime       @updatedAt
+  id              String          @id @default(cuid())
+  created_at      DateTime        @default(now())
+  updated_at      DateTime        @updatedAt
   player_name     String?
   game_id         String
   room_id         String?
-  score           Int            @default(0)
-  correct_answers Int            @default(0)
-  wrong_answers   Int            @default(0)
-  skipped_answers Int            @default(0)
+  status          PlayerStatus    @default(ACTIVE)
+  score           Int             @default(0)
+  correct_answers Int             @default(0)
+  wrong_answers   Int             @default(0)
+  skipped_answers Int             @default(0)
   player_order    Int
   final_rank      Int?
   user_id         String?
-  game            Game           @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  room            Room?          @relation(fields: [room_id], references: [id])
-  user            User?          @relation(fields: [user_id], references: [id])
-  is_guest        Boolean  @default(false)
+  game            Game            @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  room            Room?           @relation(fields: [room_id], references: [id])
+  user            User?           @relation(fields: [user_id], references: [id])
+  is_guest        Boolean         @default(false)
   player_answers  PlayerAnswer[]
   game_selections GameSelection[]
 
@@ -517,11 +527,20 @@ model PlayerAnswer {
   @@map("player_answers")
 }
 
+enum RoomStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+}
+
 model Room {
   id           String       @id @default(cuid())
   code         String       @unique
   game_id      String
   host_id      String
+  name         String?
+  scheduled_at DateTime?
+  status       RoomStatus   @default(WAITING)
   created_at   DateTime     @default(now())
   game_players GamePlayer[]
   game         Game         @relation(fields: [game_id], references: [id], onDelete: Cascade)
@@ -547,6 +566,7 @@ model Leaderboard {
   game         Game?     @relation(fields: [game_id], references: [id], onDelete: Cascade)
   user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@unique([user_id, game_id])
   @@map("leaderboards")
 }
 
@@ -635,8 +655,21 @@ model Question {
   question_type  QuestionType?   @relation(fields: [question_type_id], references: [id], onDelete: Cascade) // Relation with QuestionType model
   answers        Answer[] // Related answers to the question
   player_answers PlayerAnswer[] // Game answers for this question
+  GameQuestion   GameQuestion[]
 
   @@map("questions") // Table name in database
+}
+
+model GameQuestion {
+  id          String   @id @default(cuid())
+  game_id     String
+  question_id String
+  created_at  DateTime @default(now())
+
+  game     Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@unique([game_id, question_id]) // same game এ এক প্রশ্ন repeat হবে না
 }
 
 model Answer {
