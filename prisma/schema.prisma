@@ -467,17 +467,17 @@ model Game {
 model GameSelection {
   id            String   @id @default(cuid())
   game_id       String
-  player_id     String // GamePlayer ID
+  player_id     String? // GamePlayer ID
   category_id   String
   difficulty_id String
   points        Int // Points for this selection
   is_used       Boolean  @default(false)
   created_at    DateTime @default(now())
 
-  game       Game       @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  player     GamePlayer @relation(fields: [player_id], references: [id], onDelete: Cascade)
-  category   Category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
-  difficulty Difficulty @relation(fields: [difficulty_id], references: [id], onDelete: Cascade)
+  game       Game        @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  player     GamePlayer? @relation(fields: [player_id], references: [id], onDelete: Cascade)
+  category   Category    @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  difficulty Difficulty  @relation(fields: [difficulty_id], references: [id], onDelete: Cascade)
 
   @@map("game_selections")
 }
