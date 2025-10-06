@@ -708,8 +708,9 @@ export class GamePlayerController {
       return await this.gamePlayerService.answerCompetitiveQuestion(
         dto.game_id,
         dto.question_id,
-        dto.answer_id,
         dto.player_id,
+        dto.answer_id,
+        dto.answer_text,
       );
     } catch (error) {
       return {

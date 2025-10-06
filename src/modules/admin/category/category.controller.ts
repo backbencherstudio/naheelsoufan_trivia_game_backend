@@ -23,43 +23,59 @@ import { Role } from '../../../common/guard/role/role.enum';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Category')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
 @Controller('admin/categories')
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) { }
+  constructor(private readonly categoryService: CategoryService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)  // Restrict to admin roles
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Create a new category' })
   @Post()
-  @UseInterceptors(FileInterceptor('file'))  // Handle file upload for category image
+  @UseInterceptors(FileInterceptor('file')) // Handle file upload for category image
   async create(
     @Body() createCategoryDto: CreateCategoryDto,
     @UploadedFile() file: Express.Multer.File,
     @Req() req: any,
   ) {
-    return await this.categoryService.create(createCategoryDto, file)
+    return await this.categoryService.create(createCategoryDto, file);
   }
 
-  @ApiOperation({ summary: 'Read all categories with optional search and language filter' })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Read all categories with optional search and language filter',
+  })
   @Get()
-  async findAll(@Query() query: { q?: string, page?: number, limit?: number, language_id?: string }) {
+  async findAll(
+    @Query()
+    query: {
+      q?: string;
+      page?: number;
+      limit?: number;
+      language_id?: string;
+    },
+  ) {
     try {
-      const searchQuery = query.q;  // Optional search query
+      const searchQuery = query.q; // Optional search query
       const page = query.page ? Number(query.page) : 1;
       const limit = query.limit ? Number(query.limit) : 10;
-      const languageId = query.language_id;  // Optional language filter
-      const categories = await this.categoryService.findAll(searchQuery, page, limit, languageId);  // Fetch all categories
+      const languageId = query.language_id; // Optional language filter
+      const categories = await this.categoryService.findAll(
+        searchQuery,
+        page,
+        limit,
+        languageId,
+      ); // Fetch all categories
       return categories;
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if fetching fails
+        message: error.message, // Return error message if fetching fails
       };
     }
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Import categories from file' })
   @Post('import')
   @UseInterceptors(FileInterceptor('file'))
@@ -85,6 +101,8 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Export all categories' })
   @Get('export')
   async exportCategories() {
@@ -99,53 +117,59 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Read one category' })
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {
-      const category = await this.categoryService.findOne(id);  // Fetch a category by ID
+      const category = await this.categoryService.findOne(id); // Fetch a category by ID
       return category;
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if fetching fails
+        message: error.message, // Return error message if fetching fails
       };
     }
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)  // Restrict to admin roles
+  @Roles(Role.ADMIN) // Restrict to admin roles
   @ApiOperation({ summary: 'Update a category' })
   @Patch(':id')
-  @UseInterceptors(FileInterceptor('file'))  // Handle file upload for image
+  @UseInterceptors(FileInterceptor('file')) // Handle file upload for image
   async update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
     try {
-      const category = await this.categoryService.update(id, updateCategoryDto, file);
-      return category;  // Return updated category data
+      const category = await this.categoryService.update(
+        id,
+        updateCategoryDto,
+        file,
+      );
+      return category; // Return updated category data
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if updating fails
+        message: error.message, // Return error message if updating fails
       };
     }
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)  // Restrict to admin roles
+  @Roles(Role.ADMIN) // Restrict to admin roles
   @ApiOperation({ summary: 'Delete a category' })
   @Delete(':id')
   async remove(@Param('id') id: string) {
     try {
-      const category = await this.categoryService.remove(id);  // Delete category by ID
+      const category = await this.categoryService.remove(id); // Delete category by ID
       return category;
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if deletion fails
+        message: error.message, // Return error message if deletion fails
       };
     }
   }
