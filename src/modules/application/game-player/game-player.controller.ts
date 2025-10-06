@@ -737,8 +737,8 @@ export class GamePlayerController {
 
       return await this.gamePlayerService.handleQuestionTimeout(
         timeoutDto.game_id,
-        timeoutDto.player_id,
         timeoutDto.question_id,
+        timeoutDto.player_id,
       );
     } catch (error) {
       // সাধারণ এরর হ্যান্ডলিং

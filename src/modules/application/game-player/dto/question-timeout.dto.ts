@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class QuestionTimeoutDto {
   @ApiProperty({
@@ -23,6 +23,6 @@ export class QuestionTimeoutDto {
     example: 'clxkfziup000208l4b5n6a7d8',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   player_id: string;
 }

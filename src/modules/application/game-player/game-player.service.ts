@@ -3118,7 +3118,6 @@ export class GamePlayerService {
         };
       } else {
         if (isStealMode) {
-          // console.log('steal correct');
           const firstAnswerer = await this.prisma.playerAnswer.findFirst({
             where: {
               question_id: questionId,
@@ -3129,21 +3128,6 @@ export class GamePlayerService {
             orderBy: { created_at: 'asc' },
           });
 
-          console.log('eita first answer steal true te', firstAnswerer);
-          // let nextPlayerForNewQuestion = game.game_players[0];
-          // if (firstAnswerer) {
-          //   const originalPlayerIndex = game.game_players.findIndex(
-          //     (p) => p.id === firstAnswerer.game_player_id,
-          //   );
-          //   if (originalPlayerIndex !== -1) {
-          //     nextPlayerForNewQuestion =
-          //       game.game_players[
-          //         (originalPlayerIndex + 1) % game.game_players.length
-          //       ];
-          //   }
-          // }
-
-          console.log('wrong answer for steal');
           await this.prisma.game.update({
             where: { id: gameId },
             data: {
@@ -3245,8 +3229,8 @@ export class GamePlayerService {
   // timeout steal mode
   async handleQuestionTimeout(
     gameId: string,
-    playerId: string,
     questionId: string,
+    playerId?: string,
   ) {
     try {
       const game = await this.prisma.game.findUnique({
@@ -3255,59 +3239,87 @@ export class GamePlayerService {
       });
 
       if (!game) {
-        return {
-          success: true,
-          message: 'Game not found',
-          statusCode: 404,
-        };
-      }
-      if (game.current_player_id !== playerId) {
-        return {
-          success: true,
-          message: "It's not this player's turn to time out.",
-          statusCode: 403,
-        };
+        return { success: false, message: 'Game not found', statusCode: 404 };
       }
 
-      await this.prisma.gamePlayer.update({
-        where: { id: playerId },
-        data: { skipped_answers: { increment: 1 } },
-      });
+      const isStealModeTimeout = !playerId;
 
-      await this.prisma.$transaction([
-        this.prisma.gamePlayer.update({
-          where: { id: playerId },
-          data: { skipped_answers: { increment: 1 } },
-        }),
-        this.prisma.playerAnswer.create({
-          data: {
-            game_player_id: playerId,
+      if (isStealModeTimeout) {
+        const firstAnswerer = await this.prisma.playerAnswer.findFirst({
+          where: {
             question_id: questionId,
-            isCorrect: false, // its for timeout
-            // answer_id is null
+            game_player: {
+              game_id: gameId,
+            },
           },
-        }),
-        this.prisma.game.update({
+          orderBy: { created_at: 'asc' },
+        });
+
+        await this.prisma.game.update({
           where: { id: gameId },
           data: {
-            current_player_id: null,
-            game_phase: 'STEAL_MODE_ON_TIMEOUT',
+            game_phase: 'ROUND_COMPLETED',
+            current_player_id: firstAnswerer.game_player_id,
           },
-        }),
-      ]);
+        });
 
-      return {
-        success: true,
-        message: `Time is up! The question is now open for anyone to steal.`,
-        data: {
-          next_action: 'OPEN_FOR_STEAL',
-          question_id: questionId,
-        },
-      };
+        return {
+          success: true,
+          message: 'Steal time is over! Moving to the next round.',
+          data: {
+            next_action: 'SELECT_NEW_QUESTION_FOR_NEXT_PLAYER',
+            // next_player_id: nextPlayerForNewQuestion.id,
+          },
+        };
+      } else {
+        if (game.current_player_id !== playerId) {
+          return {
+            success: false,
+            message: "It's not this player's turn to time out.",
+            statusCode: 403,
+          };
+        }
+
+        // Timeout player record
+        await this.prisma.$transaction([
+          this.prisma.gamePlayer.update({
+            where: { id: playerId },
+            data: { skipped_answers: { increment: 1 } },
+          }),
+          this.prisma.playerAnswer.create({
+            data: {
+              game_player_id: playerId,
+              question_id: questionId,
+              isCorrect: false,
+            },
+          }),
+          this.prisma.game.update({
+            where: { id: gameId },
+            data: {
+              current_player_id: null,
+              game_phase: 'STEAL_MODE_ON_TIMEOUT',
+            },
+          }),
+        ]);
+
+        return {
+          success: true,
+          message: `Time is up! The question is now open for anyone to steal.`,
+          data: {
+            next_action: 'OPEN_FOR_STEAL',
+            question_id: questionId,
+          },
+        };
+      }
     } catch (error) {
+      console.error(
+        `Error in handleQuestionTimeout: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
-        message: `Error selecting question: ${error.message}`,
+        message: 'An unexpected error occurred while handling the timeout.',
+        statusCode: 500,
       };
     }
   }
