@@ -2911,10 +2911,6 @@ export class GamePlayerService {
     answerText?: string,
   ) {
     try {
-      // console.log('steal search');
-      console.log('gameid', gameId);
-      console.log('playerid', playerId);
-      console.log('question id', questionId);
       const game = await this.prisma.game.findUnique({
         where: { id: gameId },
         include: { game_players: { orderBy: { player_order: 'asc' } } },
@@ -2927,8 +2923,9 @@ export class GamePlayerService {
       const isStealMode = game.current_player_id === null;
 
       if (isStealMode) {
+        // for same player attemt to steal question
         const answerers = await this.prisma.playerAnswer.findMany({
-          where: { question_id: questionId },
+          where: { question_id: questionId, game_player: { game_id: gameId } },
           orderBy: { created_at: 'asc' },
         });
         if (answerers.some((answer) => answer.game_player_id === playerId)) {
@@ -3042,7 +3039,6 @@ export class GamePlayerService {
         game.game_players,
       );
 
-      // here the issue
       let isRoundOver = false;
       const lastPlayerInOrder = game.game_players[game.game_players.length - 1];
 
@@ -3111,7 +3107,7 @@ export class GamePlayerService {
             player_id: playerId,
             player_name: player.player_name,
             next_turn_for: {
-              // nicher ekhane update kora lagbe
+              // it will be for another task
               player_id: nextTurnPlayer.game_player_id,
               // player_name: nextTurnPlayer.player_name,
               // player_order: nextTurnPlayer.player_order,
@@ -3127,7 +3123,7 @@ export class GamePlayerService {
             where: {
               question_id: questionId,
               game_player: {
-                game_id: gameId, // <-- game_id দিয়ে ফিল্টার করা হচ্ছে
+                game_id: gameId,
               },
             },
             orderBy: { created_at: 'asc' },
@@ -3168,7 +3164,7 @@ export class GamePlayerService {
                 text: correctAnswer?.text,
               },
               next_action: 'SELECT_NEW_QUESTION_FOR_NEXT_PLAYER',
-              // nicher ekhane update korte hobe
+              // need to update here
               next_player_id: firstAnswerer.game_player_id,
               all_players_history: allPlayersHistory,
               is_round_over: isRoundOver,
@@ -3246,6 +3242,7 @@ export class GamePlayerService {
     }));
   }
 
+  // timeout steal mode
   async handleQuestionTimeout(
     gameId: string,
     playerId: string,
@@ -3277,13 +3274,27 @@ export class GamePlayerService {
         data: { skipped_answers: { increment: 1 } },
       });
 
-      await this.prisma.game.update({
-        where: { id: gameId },
-        data: {
-          current_player_id: null,
-          game_phase: 'STEAL_MODE_ON_TIMEOUT',
-        },
-      });
+      await this.prisma.$transaction([
+        this.prisma.gamePlayer.update({
+          where: { id: playerId },
+          data: { skipped_answers: { increment: 1 } },
+        }),
+        this.prisma.playerAnswer.create({
+          data: {
+            game_player_id: playerId,
+            question_id: questionId,
+            isCorrect: false, // its for timeout
+            // answer_id is null
+          },
+        }),
+        this.prisma.game.update({
+          where: { id: gameId },
+          data: {
+            current_player_id: null,
+            game_phase: 'STEAL_MODE_ON_TIMEOUT',
+          },
+        }),
+      ]);
 
       return {
         success: true,
