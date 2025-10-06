@@ -2906,10 +2906,15 @@ export class GamePlayerService {
   async answerCompetitiveQuestion(
     gameId: string,
     questionId: string,
-    answerId: string,
     playerId: string,
+    answerId?: string,
+    answerText?: string,
   ) {
     try {
+      // console.log('steal search');
+      console.log('gameid', gameId);
+      console.log('playerid', playerId);
+      console.log('question id', questionId);
       const game = await this.prisma.game.findUnique({
         where: { id: gameId },
         include: { game_players: { orderBy: { player_order: 'asc' } } },
@@ -2953,7 +2958,7 @@ export class GamePlayerService {
         this.prisma.gamePlayer.findUnique({ where: { id: playerId } }),
         this.prisma.question.findUnique({
           where: { id: questionId },
-          include: { answers: true },
+          include: { answers: true, question_type: true },
         }),
       ]);
 
@@ -2964,17 +2969,46 @@ export class GamePlayerService {
           statusCode: 404,
         };
       }
-      const selectedAnswer = question.answers.find((a) => a.id === answerId);
-      if (!selectedAnswer) {
-        return {
-          success: false,
-          message: 'Invalid answer selected',
-          statusCode: 400,
-        };
+
+      let isCorrect = false;
+      let selectedAnswerIdForDB: string | null = null;
+      const correctAnswer = question.answers.find((a) => a.is_correct);
+
+      if (question.question_type.name === 'Text') {
+        if (answerText === undefined || answerText === null) {
+          return {
+            success: false,
+            message: 'Answer text is required for this question type.',
+            statusCode: 400,
+          };
+        }
+
+        if (correctAnswer) {
+          isCorrect =
+            answerText.trim().toLowerCase() ===
+            correctAnswer.text.trim().toLowerCase();
+        }
+        selectedAnswerIdForDB = isCorrect ? correctAnswer.id : null;
+      } else {
+        if (!answerId) {
+          return {
+            success: false,
+            message: 'Answer ID is required for this question type.',
+            statusCode: 400,
+          };
+        }
+        const selectedAnswer = question.answers.find((a) => a.id === answerId);
+        if (!selectedAnswer) {
+          return {
+            success: false,
+            message: 'Invalid answer selected',
+            statusCode: 400,
+          };
+        }
+        isCorrect = selectedAnswer.is_correct;
+        selectedAnswerIdForDB = selectedAnswer.id;
       }
 
-      const correctAnswer = question.answers.find((a) => a.is_correct);
-      const isCorrect = selectedAnswer.is_correct;
       const pointsEarned = isCorrect
         ? isStealMode
           ? Math.round(question.points / 2)
@@ -2986,7 +3020,7 @@ export class GamePlayerService {
           data: {
             game_player_id: playerId,
             question_id: questionId,
-            answer_id: answerId,
+            answer_id: selectedAnswerIdForDB,
             isCorrect,
           },
         }),
@@ -3008,6 +3042,7 @@ export class GamePlayerService {
         game.game_players,
       );
 
+      // here the issue
       let isRoundOver = false;
       const lastPlayerInOrder = game.game_players[game.game_players.length - 1];
 
@@ -3017,9 +3052,15 @@ export class GamePlayerService {
         }
       } else if (isStealMode) {
         const firstAnswerer = await this.prisma.playerAnswer.findFirst({
-          where: { question_id: questionId },
+          where: {
+            question_id: questionId,
+            game_player: {
+              game_id: gameId,
+            },
+          },
           orderBy: { created_at: 'asc' },
         });
+        console.log('Ekhane first answer pabo', firstAnswerer);
         if (firstAnswerer) {
           const originalPlayer = game.game_players.find(
             (p) => p.id === firstAnswerer.game_player_id,
@@ -3041,18 +3082,18 @@ export class GamePlayerService {
       }
 
       if (isCorrect) {
-        const currentPlayerIndex = game.game_players.findIndex(
-          (p) => p.id === playerId,
-        );
-        const nextTurnPlayer =
-          game.game_players[
-            (currentPlayerIndex + 1) % game.game_players.length
-          ];
+        const firstAnswerer = await this.prisma.playerAnswer.findFirst({
+          where: { question_id: questionId, game_player: { game_id: gameId } },
+          orderBy: { created_at: 'asc' },
+        });
+        let nextTurnPlayer = firstAnswerer;
+        console.log('first answer player', firstAnswerer);
 
         await this.prisma.game.update({
           where: { id: gameId },
           data: {
             game_phase: 'ROUND_COMPLETED',
+            current_player_id: firstAnswerer.game_player_id,
           },
         });
 
@@ -3070,9 +3111,10 @@ export class GamePlayerService {
             player_id: playerId,
             player_name: player.player_name,
             next_turn_for: {
-              player_id: nextTurnPlayer.id,
-              player_name: nextTurnPlayer.player_name,
-              player_order: nextTurnPlayer.player_order,
+              // nicher ekhane update kora lagbe
+              player_id: nextTurnPlayer.game_player_id,
+              // player_name: nextTurnPlayer.player_name,
+              // player_order: nextTurnPlayer.player_order,
             },
             all_players_history: allPlayersHistory,
             is_round_over: isRoundOver,
@@ -3080,28 +3122,37 @@ export class GamePlayerService {
         };
       } else {
         if (isStealMode) {
+          // console.log('steal correct');
           const firstAnswerer = await this.prisma.playerAnswer.findFirst({
-            where: { question_id: questionId },
+            where: {
+              question_id: questionId,
+              game_player: {
+                game_id: gameId, // <-- game_id দিয়ে ফিল্টার করা হচ্ছে
+              },
+            },
             orderBy: { created_at: 'asc' },
           });
-          let nextPlayerForNewQuestion = game.game_players[0];
-          if (firstAnswerer) {
-            const originalPlayerIndex = game.game_players.findIndex(
-              (p) => p.id === firstAnswerer.game_player_id,
-            );
-            if (originalPlayerIndex !== -1) {
-              nextPlayerForNewQuestion =
-                game.game_players[
-                  (originalPlayerIndex + 1) % game.game_players.length
-                ];
-            }
-          }
 
+          console.log('eita first answer steal true te', firstAnswerer);
+          // let nextPlayerForNewQuestion = game.game_players[0];
+          // if (firstAnswerer) {
+          //   const originalPlayerIndex = game.game_players.findIndex(
+          //     (p) => p.id === firstAnswerer.game_player_id,
+          //   );
+          //   if (originalPlayerIndex !== -1) {
+          //     nextPlayerForNewQuestion =
+          //       game.game_players[
+          //         (originalPlayerIndex + 1) % game.game_players.length
+          //       ];
+          //   }
+          // }
+
+          console.log('wrong answer for steal');
           await this.prisma.game.update({
             where: { id: gameId },
             data: {
               game_phase: 'ROUND_COMPLETED',
-              current_player_id: nextPlayerForNewQuestion.id,
+              current_player_id: firstAnswerer.game_player_id,
             },
           });
 
@@ -3117,7 +3168,8 @@ export class GamePlayerService {
                 text: correctAnswer?.text,
               },
               next_action: 'SELECT_NEW_QUESTION_FOR_NEXT_PLAYER',
-              next_player_id: nextPlayerForNewQuestion.id,
+              // nicher ekhane update korte hobe
+              next_player_id: firstAnswerer.game_player_id,
               all_players_history: allPlayersHistory,
               is_round_over: isRoundOver,
             },
@@ -3153,7 +3205,6 @@ export class GamePlayerService {
         }
       }
     } catch (error) {
-      console.error(`Error answering question: ${error.message}`, error.stack);
       return {
         success: false,
         message: 'An unexpected error occurred while answering the question.',
@@ -3249,6 +3300,170 @@ export class GamePlayerService {
       };
     }
   }
+
+  /**
+   * Select category/difficulty and start game in one step
+   */
+  // multiplayer-game.service.ts
+
+  async selectSingleQuestionForGame(
+    gameId: string,
+    categoryId: string,
+    difficultyId: string,
+  ) {
+    try {
+      const game = await this.prisma.game.findUnique({
+        where: { id: gameId },
+        include: {
+          game_players: {
+            orderBy: { player_order: 'asc' },
+          },
+          game_questions: true,
+          rooms: true,
+        },
+      });
+
+      if (!game) {
+        throw new NotFoundException('Game not found');
+      }
+
+      if (game.game_players.length === 0) {
+        throw new BadRequestException(
+          'No players have been added to this game yet.',
+        );
+      }
+
+      let currentPlayer;
+      const totalPlayers = game.game_players.length;
+
+      if (game.current_player_id === null) {
+        currentPlayer = game.game_players[0];
+      } else {
+        const lastPlayerIndex = game.game_players.findIndex(
+          (p) => p.id === game.current_player_id,
+        );
+        const nextPlayerIndex = (lastPlayerIndex + 1) % totalPlayers;
+        currentPlayer = game.game_players[nextPlayerIndex];
+      }
+
+      const allQuestions = await this.prisma.question.findMany({
+        where: {
+          category_id: categoryId,
+          difficulty_id: difficultyId,
+        },
+        include: {
+          answers: {
+            select: { id: true, text: true, file_url: true, is_correct: true },
+          },
+          question_type: {
+            select: { id: true, name: true },
+          },
+        },
+      });
+
+      if (!allQuestions.length) {
+        throw new BadRequestException(
+          'No questions available for selected category and difficulty',
+        );
+      }
+
+      const usedQuestionIds = game.game_questions.map((q) => q.question_id);
+      const availableQuestions = allQuestions.filter(
+        (q) => !usedQuestionIds.includes(q.id),
+      );
+
+      if (!availableQuestions.length) {
+        throw new BadRequestException(
+          'All questions for this category/difficulty have already been used in this game',
+        );
+      }
+
+      const selectedQuestion =
+        availableQuestions[
+          Math.floor(Math.random() * availableQuestions.length)
+        ];
+
+      await this.prisma.$transaction([
+        this.prisma.gameQuestion.create({
+          data: {
+            game_id: gameId,
+            question_id: selectedQuestion.id,
+          },
+        }),
+        this.prisma.game.update({
+          where: { id: gameId },
+          data: {
+            game_phase: 'QUESTION_SELECTED',
+            current_player_id: currentPlayer.id,
+            current_question: game.current_question + 1,
+            question_asked_at: new Date(),
+          },
+        }),
+      ]);
+
+      const correctAnswer = selectedQuestion.answers.find(
+        (a) => a.is_correct === true,
+      );
+      const formattedQuestion = {
+        id: selectedQuestion.id,
+        text: selectedQuestion.text,
+        points: selectedQuestion.points,
+        time_limit: selectedQuestion.time,
+        file_url: selectedQuestion.file_url,
+        question_type: selectedQuestion.question_type,
+        answers: selectedQuestion.answers.map((a) => ({
+          id: a.id,
+          text: a.text,
+          file_url: a.file_url,
+        })),
+        correct_answer: {
+          id: correctAnswer?.id,
+          text: correctAnswer?.text,
+        },
+      };
+
+      const responseData = {
+        question: formattedQuestion,
+        currentPlayer: {
+          id: currentPlayer.id,
+          name: currentPlayer.player_name,
+          player_order: currentPlayer.player_order,
+        },
+        game_info: {
+          current_question_number: game.current_question + 1,
+        },
+      };
+
+      const isMultiPhoneGame = game.rooms && game.rooms.length > 0;
+
+      if (isMultiPhoneGame) {
+        const roomId = game.rooms[0].id;
+        this.gatway.emitNewQuestionForMultiplayer(roomId, responseData);
+      }
+
+      return {
+        success: true,
+        message: `Question selected for ${currentPlayer.player_name}. It's their turn to answer.`,
+        data: responseData,
+      };
+    } catch (error) {
+      // NestJS-এর ডিফল্ট এরর হ্যান্ডলিং ব্যবহার করা ভালো
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      console.error(
+        `Error in selectSingleQuestionForGame: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'An unexpected error occurred while selecting a question.',
+      );
+    }
+  }
+
   /**
    * Get player IDs for a game (helper method for debugging)
    */
@@ -3966,168 +4181,6 @@ export class GamePlayerService {
   //   }
   // }
 
-  /**
-   * Select category/difficulty and start game in one step
-   */
-  // multiplayer-game.service.ts
-
-  async selectSingleQuestionForGame(
-    gameId: string,
-    categoryId: string,
-    difficultyId: string,
-  ) {
-    try {
-      const game = await this.prisma.game.findUnique({
-        where: { id: gameId },
-        include: {
-          game_players: {
-            orderBy: { player_order: 'asc' },
-          },
-          game_questions: true,
-          rooms: true,
-        },
-      });
-
-      if (!game) {
-        throw new NotFoundException('Game not found');
-      }
-
-      if (game.game_players.length === 0) {
-        throw new BadRequestException(
-          'No players have been added to this game yet.',
-        );
-      }
-
-      let currentPlayer;
-      const totalPlayers = game.game_players.length;
-
-      if (game.current_player_id === null) {
-        currentPlayer = game.game_players[0];
-      } else {
-        const lastPlayerIndex = game.game_players.findIndex(
-          (p) => p.id === game.current_player_id,
-        );
-        const nextPlayerIndex = (lastPlayerIndex + 1) % totalPlayers;
-        currentPlayer = game.game_players[nextPlayerIndex];
-      }
-
-      const allQuestions = await this.prisma.question.findMany({
-        where: {
-          category_id: categoryId,
-          difficulty_id: difficultyId,
-        },
-        include: {
-          answers: {
-            select: { id: true, text: true, file_url: true, is_correct: true },
-          },
-          question_type: {
-            select: { id: true, name: true },
-          },
-        },
-      });
-
-      if (!allQuestions.length) {
-        throw new BadRequestException(
-          'No questions available for selected category and difficulty',
-        );
-      }
-
-      const usedQuestionIds = game.game_questions.map((q) => q.question_id);
-      const availableQuestions = allQuestions.filter(
-        (q) => !usedQuestionIds.includes(q.id),
-      );
-
-      if (!availableQuestions.length) {
-        throw new BadRequestException(
-          'All questions for this category/difficulty have already been used in this game',
-        );
-      }
-
-      const selectedQuestion =
-        availableQuestions[
-          Math.floor(Math.random() * availableQuestions.length)
-        ];
-
-      await this.prisma.$transaction([
-        this.prisma.gameQuestion.create({
-          data: {
-            game_id: gameId,
-            question_id: selectedQuestion.id,
-          },
-        }),
-        this.prisma.game.update({
-          where: { id: gameId },
-          data: {
-            game_phase: 'QUESTION_SELECTED',
-            current_player_id: currentPlayer.id,
-            current_question: game.current_question + 1,
-            question_asked_at: new Date(),
-          },
-        }),
-      ]);
-
-      const correctAnswer = selectedQuestion.answers.find(
-        (a) => a.is_correct === true,
-      );
-      const formattedQuestion = {
-        id: selectedQuestion.id,
-        text: selectedQuestion.text,
-        points: selectedQuestion.points,
-        time_limit: selectedQuestion.time,
-        file_url: selectedQuestion.file_url,
-        question_type: selectedQuestion.question_type,
-        answers: selectedQuestion.answers.map((a) => ({
-          id: a.id,
-          text: a.text,
-          file_url: a.file_url,
-        })),
-        correct_answer: {
-          id: correctAnswer?.id,
-          text: correctAnswer?.text,
-        },
-      };
-
-      const responseData = {
-        question: formattedQuestion,
-        currentPlayer: {
-          id: currentPlayer.id,
-          name: currentPlayer.player_name,
-          player_order: currentPlayer.player_order,
-        },
-        game_info: {
-          current_question_number: game.current_question + 1,
-        },
-      };
-
-      const isMultiPhoneGame = game.rooms && game.rooms.length > 0;
-
-      if (isMultiPhoneGame) {
-        const roomId = game.rooms[0].id;
-        this.gatway.emitNewQuestionForMultiplayer(roomId, responseData);
-      }
-
-      return {
-        success: true,
-        message: `Question selected for ${currentPlayer.player_name}. It's their turn to answer.`,
-        data: responseData,
-      };
-    } catch (error) {
-      // NestJS-এর ডিফল্ট এরর হ্যান্ডলিং ব্যবহার করা ভালো
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-      console.error(
-        `Error in selectSingleQuestionForGame: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'An unexpected error occurred while selecting a question.',
-      );
-    }
-  }
   /**
    * Player selects their own category and difficulty on their turn
    */
