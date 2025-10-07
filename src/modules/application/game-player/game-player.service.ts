@@ -1142,7 +1142,6 @@ export class GamePlayerService {
         },
       };
     } catch (error) {
-      console.error(`Error in endGame: ${error.message}`, error.stack);
       return {
         success: false,
         message: 'An unexpected error occurred while ending the game.',
@@ -3056,7 +3055,7 @@ export class GamePlayerService {
           },
           orderBy: { created_at: 'asc' },
         });
-        console.log('Ekhane first answer pabo', firstAnswerer);
+
         if (firstAnswerer) {
           const originalPlayer = game.game_players.find(
             (p) => p.id === firstAnswerer.game_player_id,
@@ -3083,7 +3082,6 @@ export class GamePlayerService {
           orderBy: { created_at: 'asc' },
         });
         let nextTurnPlayer = firstAnswerer;
-        console.log('first answer player', firstAnswerer);
 
         await this.prisma.game.update({
           where: { id: gameId },
@@ -3312,10 +3310,6 @@ export class GamePlayerService {
         };
       }
     } catch (error) {
-      console.error(
-        `Error in handleQuestionTimeout: ${error.message}`,
-        error.stack,
-      );
       return {
         success: false,
         message: 'An unexpected error occurred while handling the timeout.',
@@ -3477,10 +3471,6 @@ export class GamePlayerService {
       ) {
         throw error;
       }
-      console.error(
-        `Error in selectSingleQuestionForGame: ${error.message}`,
-        error.stack,
-      );
       throw new InternalServerErrorException(
         'An unexpected error occurred while selecting a question.',
       );
@@ -4738,7 +4728,7 @@ export class GamePlayerService {
         },
       });
     } catch (error) {
-      console.error('Error moving to next question:', error);
+      // console.error('Error moving to next question:', error);
     }
   }
 

@@ -5,7 +5,7 @@ import { TransactionRepository } from '../../../common/repository/transaction/tr
 
 @Controller('payment/stripe')
 export class StripeController {
-  constructor(private readonly stripeService: StripeService) { }
+  constructor(private readonly stripeService: StripeService) {}
 
   @Post('webhook')
   async handleWebhook(
@@ -33,7 +33,7 @@ export class StripeController {
           await TransactionRepository.updateTransaction({
             reference_number: paymentIntent.id,
             status: 'succeeded',
-            paid_amount: paymentIntent.amount / 100, // amount in dollars
+            paid_amount: paymentIntent.amount / 100,
             paid_currency: paymentIntent.currency,
             raw_status: paymentIntent.status,
           });
@@ -41,14 +41,19 @@ export class StripeController {
           // Handle subscription payment success
           if (paymentIntent.metadata && paymentIntent.metadata.subscriptionId) {
             // Import SubscriptionService dynamically to avoid circular dependencies
-            const { SubscriptionService } = await import('../../application/subscription/subscription.service');
-            const { PrismaService } = await import('../../../prisma/prisma.service');
+            const { SubscriptionService } = await import(
+              '../../application/subscription/subscription.service'
+            );
+            const { PrismaService } = await import(
+              '../../../prisma/prisma.service'
+            );
 
             const prisma = new PrismaService();
             const subscriptionService = new SubscriptionService(prisma);
 
             await subscriptionService.handlePaymentSuccess(paymentIntent.id);
           }
+          console.log('payment done');
           break;
         case 'payment_intent.payment_failed':
           const failedPaymentIntent = event.data.object;
@@ -60,15 +65,24 @@ export class StripeController {
           });
 
           // Handle subscription payment failure
-          if (failedPaymentIntent.metadata && failedPaymentIntent.metadata.subscriptionId) {
+          if (
+            failedPaymentIntent.metadata &&
+            failedPaymentIntent.metadata.subscriptionId
+          ) {
             // Import SubscriptionService dynamically to avoid circular dependencies
-            const { SubscriptionService } = await import('../../application/subscription/subscription.service');
-            const { PrismaService } = await import('../../../prisma/prisma.service');
+            const { SubscriptionService } = await import(
+              '../../application/subscription/subscription.service'
+            );
+            const { PrismaService } = await import(
+              '../../../prisma/prisma.service'
+            );
 
             const prisma = new PrismaService();
             const subscriptionService = new SubscriptionService(prisma);
 
-            await subscriptionService.handlePaymentFailed(failedPaymentIntent.id);
+            await subscriptionService.handlePaymentFailed(
+              failedPaymentIntent.id,
+            );
           }
           break;
         case 'payment_intent.canceled':
