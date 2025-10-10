@@ -24,66 +24,133 @@ export class MultiplayerGameService {
    * API 1: Create a new multiplayer game, a room, and add the host as the first player.
    */
   async createGame(createDto: CreateMultiplayerGameDto, hostId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const game = await tx.game.create({
-        data: {
+    try {
+      const gamesOfThisType = await this.prisma.game.count({
+        where: {
+          host_id: hostId,
           mode: createDto.mode,
-          language_id: createDto.language_id,
-          host_id: hostId,
-          game_phase: 'waiting',
         },
       });
 
-      const hostUser = await this.prisma.user.findUnique({
-        where: { id: hostId },
-        select: { name: true },
+      if (gamesOfThisType > 0) {
+        const activeSubscription = await this.prisma.subscription.findFirst({
+          where: {
+            user_id: hostId,
+            status: 'active',
+          },
+          include: {
+            subscription_type: true,
+          },
+        });
+
+        if (!activeSubscription) {
+          return {
+            success: false,
+            message: `No games remaining in your subscription. Please upgrade or purchase a new subscription.`,
+            data: { requires_subscription: true },
+          };
+        }
+
+        const gamesPlayed = activeSubscription.games_played_count;
+        const gamesLimit = activeSubscription.subscription_type.games;
+
+        if (gamesLimit !== -1 && gamesPlayed >= gamesLimit) {
+          await this.prisma.subscription.update({
+            where: { id: activeSubscription.id },
+            data: { status: 'completed' },
+          });
+
+          return {
+            success: false,
+            message:
+              'No games remaining in your subscription. Please upgrade or purchase a new subscription.',
+            data: {
+              subscription_exhausted: true,
+              games_limit: gamesLimit,
+              games_played: gamesPlayed,
+            },
+          };
+        }
+      }
+
+      return this.prisma.$transaction(async (tx) => {
+        if (gamesOfThisType > 0) {
+          const subscriptionToUpdate = await tx.subscription.findFirst({
+            where: { user_id: hostId, status: 'active' },
+          });
+          if (subscriptionToUpdate) {
+            await tx.subscription.update({
+              where: { id: subscriptionToUpdate.id },
+              data: { games_played_count: { increment: 1 } },
+            });
+          }
+        }
+
+        const game = await tx.game.create({
+          data: {
+            mode: createDto.mode,
+            language_id: createDto.language_id,
+            host_id: hostId,
+            game_phase: 'waiting',
+          },
+        });
+
+        const hostUser = await tx.user.findUnique({
+          where: { id: hostId },
+          select: { name: true },
+        });
+
+        const roomCode = `RM${randomBytes(3).toString('hex').toUpperCase()}`;
+
+        const room = await tx.room.create({
+          data: {
+            code: roomCode,
+            game_id: game.id,
+            host_id: hostId,
+            status: 'WAITING',
+          },
+        });
+
+        const hostPlayer = await tx.gamePlayer.create({
+          data: {
+            game_id: game.id,
+            room_id: room.id,
+            user_id: hostId,
+            player_order: 1,
+            status: 'ACTIVE',
+            player_name: hostUser.name,
+          },
+          include: {
+            user: { select: { id: true, name: true, avatar: true } },
+          },
+        });
+
+        const isFirstGameOfType = gamesOfThisType === 0;
+
+        return {
+          success: true,
+          message: isFirstGameOfType
+            ? `Congratulations! Your first ${createDto.mode.replace('_', ' ')} game created successfully (FREE).`
+            : `${createDto.mode.replace('_', ' ')} game created successfully using your subscription.`,
+          data: {
+            game,
+            room,
+            hostPlayer,
+            is_first_game_of_type: isFirstGameOfType,
+          },
+        };
       });
-
-      // const nanoid = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6);
-      // const roomCode = nanoid();
-      // const roomCode = cuid().substring(19).toUpperCase();
-      // const randomCode = Math.random()
-      //   .toString(36)
-      //   .substring(2, 8)
-      //   .toUpperCase();
-      // const roomCode = `RM${randomCode}`;
-
-      const roomCode = `RM${randomBytes(3).toString('hex').toUpperCase()}`;
-
-      const room = await tx.room.create({
-        data: {
-          code: roomCode,
-          game_id: game.id,
-          host_id: hostId,
-          status: 'WAITING',
-        },
-      });
-
-      const hostPlayer = await tx.gamePlayer.create({
-        data: {
-          game_id: game.id,
-          room_id: room.id,
-          user_id: hostId,
-          player_order: 1,
-          status: 'ACTIVE',
-          player_name: hostUser.name,
-        },
-        include: {
-          user: { select: { id: true, name: true, avatar: true } },
-        },
-      });
-
+    } catch (error) {
+      console.error(
+        `Error creating multiplayer game: ${error.message}`,
+        error.stack,
+      );
       return {
-        success: true,
-        message:
-          'Multiplayer game created successfully. Share the room code to invite players.',
-        data: {
-          game,
-          room,
-          hostPlayer,
-        },
+        success: false,
+        message: 'An unexpected error occurred while creating the game.',
+        statusCode: 500,
       };
-    });
+    }
   }
 
   //update room details

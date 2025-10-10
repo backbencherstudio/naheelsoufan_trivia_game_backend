@@ -9,18 +9,25 @@ import {
   UseGuards,
   Req,
   HttpStatus,
-  HttpCode
+  HttpCode,
 } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
-import { CreateSubscriptionDto, PurchaseSubscriptionDto, CancelSubscriptionDto } from './dto/create-subscription.dto';
-import { SubscriptionResponseDto, PaymentIntentResponseDto, SubscriptionStatusDto } from './dto/subscription-response.dto';
+import {
+  CreateSubscriptionDto,
+  PurchaseSubscriptionDto,
+  CancelSubscriptionDto,
+} from './dto/create-subscription.dto';
+import {
+  SubscriptionResponseDto,
+  PaymentIntentResponseDto,
+  SubscriptionStatusDto,
+} from './dto/subscription-response.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
-
 
 @UseGuards(JwtAuthGuard)
 @Controller('subscription')
 export class SubscriptionController {
-  constructor(private readonly subscriptionService: SubscriptionService) { }
+  constructor(private readonly subscriptionService: SubscriptionService) {}
 
   /**
    * Get all available subscription types for a language
@@ -53,7 +60,10 @@ export class SubscriptionController {
    */
   @Post('purchase')
   @HttpCode(HttpStatus.OK)
-  async purchaseSubscription(@Req() req: any, @Body() dto: PurchaseSubscriptionDto) {
+  async purchaseSubscription(
+    @Req() req: any,
+    @Body() dto: PurchaseSubscriptionDto,
+  ) {
     const user_id = req.user?.userId;
     return await this.subscriptionService.purchaseSubscription(user_id, dto);
   }
@@ -62,7 +72,10 @@ export class SubscriptionController {
    * Cancel a subscription
    */
   @Put('cancel')
-  async cancelSubscription(@Req() req: any, @Body() dto: CancelSubscriptionDto) {
+  async cancelSubscription(
+    @Req() req: any,
+    @Body() dto: CancelSubscriptionDto,
+  ) {
     const user_id = req.user?.userId;
     return await this.subscriptionService.cancelSubscription(user_id, dto);
   }
@@ -71,7 +84,10 @@ export class SubscriptionController {
    * Check if user can play a specific game mode
    */
   @Get('can-play/:game_mode')
-  async canUserPlayGame(@Req() req: any, @Param('game_mode') game_mode: string) {
+  async canUserPlayGame(
+    @Req() req: any,
+    @Param('game_mode') game_mode: string,
+  ) {
     const user_id = req.user?.userId;
     return await this.subscriptionService.canUserPlayGame(user_id, game_mode);
   }

@@ -5,7 +5,7 @@ import { UpdateGameDto } from './dto/update-game.dto';
 
 @Injectable()
 export class GameService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   // Create a new game with subscription validation
   async create(createGameDto: CreateGameDto, user_id: string) {
@@ -14,7 +14,7 @@ export class GameService {
       const gamesOfThisType = await this.prisma.game.count({
         where: {
           host_id: user_id,
-          mode: createGameDto.mode
+          mode: createGameDto.mode,
         },
       });
 
@@ -23,8 +23,8 @@ export class GameService {
         where: {
           host_id: user_id,
           mode: {
-            in: ['QUICK_GAME', 'GRID_STYLE']
-          }
+            in: ['QUICK_GAME', 'GRID_STYLE'],
+          },
         },
       });
 
@@ -45,7 +45,7 @@ export class GameService {
           const gameTypesCreated = await this.getGameTypesCreated(user_id);
           return {
             success: false,
-            message: `You have already used your free ${createGameDto.mode.replace('_', ' ')} game. Please purchase a subscription to create more ${createGameDto.mode.replace('_', ' ')} games.`,
+            message: `No games remaining in your subscription. Please upgrade or purchase a new subscription.`,
             data: {
               requires_subscription: true,
               games_of_this_type: gamesOfThisType,
@@ -57,11 +57,23 @@ export class GameService {
         }
 
         // Check if user has remaining games in their subscription
-        const gamesRemaining = activeSubscription.subscription_type.games - activeSubscription.games_played_count;
-        if (activeSubscription.subscription_type.games !== -1 && gamesRemaining <= 0) {
+        const gamesRemaining =
+          activeSubscription.subscription_type.games -
+          activeSubscription.games_played_count;
+        if (
+          activeSubscription.subscription_type.games !== -1 &&
+          gamesRemaining <= 0
+        ) {
+          await this.prisma.subscription.update({
+            where: { id: activeSubscription.id },
+            data: {
+              status: 'completed',
+            },
+          });
           return {
             success: false,
-            message: 'No games remaining in your subscription. Please upgrade or purchase a new subscription.',
+            message:
+              'No games remaining in your subscription. Please upgrade or purchase a new subscription.',
             data: {
               subscription_exhausted: true,
               games_limit: activeSubscription.subscription_type.games,
@@ -89,7 +101,7 @@ export class GameService {
               name: true,
               email: true,
             },
-          }
+          },
         },
       });
 
@@ -129,8 +141,9 @@ export class GameService {
           total_games_created: totalGamesCount + 1,
           game_types_created: {
             ...gameTypesCreated,
-            [createGameDto.mode]: (gameTypesCreated[createGameDto.mode] || 0) + 1,
-            total: gameTypesCreated.total + 1
+            [createGameDto.mode]:
+              (gameTypesCreated[createGameDto.mode] || 0) + 1,
+            total: gameTypesCreated.total + 1,
           },
         },
       };
@@ -148,8 +161,8 @@ export class GameService {
       where: {
         host_id: user_id,
         mode: {
-          in: ['QUICK_GAME', 'GRID_STYLE']
-        }
+          in: ['QUICK_GAME', 'GRID_STYLE'],
+        },
       },
       select: {
         mode: true,
@@ -161,13 +174,92 @@ export class GameService {
     });
 
     const gameTypes = {
-      QUICK_GAME: games.filter(g => g.mode === 'QUICK_GAME').length,
-      GRID_STYLE: games.filter(g => g.mode === 'GRID_STYLE').length,
+      QUICK_GAME: games.filter((g) => g.mode === 'QUICK_GAME').length,
+      GRID_STYLE: games.filter((g) => g.mode === 'GRID_STYLE').length,
       total: games.length,
-      types_created: [...new Set(games.map(g => g.mode))],
+      types_created: [...new Set(games.map((g) => g.mode))],
     };
 
     return gameTypes;
+  }
+
+  // Find Player all games
+  async playerGames(user_id: string) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: user_id },
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found.',
+          statusCode: 404,
+        };
+      }
+
+      const gamesCreatedByUser = await this.prisma.game.findMany({
+        where: {
+          host_id: user_id,
+        },
+        select: {
+          id: true,
+          mode: true,
+          status: true,
+          created_at: true,
+          language: {
+            select: {
+              name: true,
+            },
+          },
+          _count: {
+            select: {
+              game_players: true,
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      const quickGamesCount = gamesCreatedByUser.filter(
+        (game) => game.mode === 'QUICK_GAME',
+      ).length;
+      const gridStyleGamesCount = gamesCreatedByUser.filter(
+        (game) => game.mode === 'GRID_STYLE',
+      ).length;
+
+      return {
+        success: true,
+        message: "Player's game information retrieved successfully.",
+        data: {
+          summary: {
+            total_games_created: gamesCreatedByUser.length,
+            quick_games_created: quickGamesCount,
+            grid_style_games_created: gridStyleGamesCount,
+          },
+          games: gamesCreatedByUser.map((game) => ({
+            id: game.id,
+            mode: game.mode,
+            status: game.status,
+            language: game.language.name,
+            player_count: game._count.game_players,
+            created_at: game.created_at,
+          })),
+        },
+      };
+    } catch (error) {
+      console.error(
+        `Error fetching player games for user ${user_id}: ${error.message}`,
+        error.stack,
+      );
+      return {
+        success: false,
+        message: 'An unexpected error occurred while fetching player games.',
+        statusCode: 500,
+      };
+    }
   }
 
   // Check user's game creation eligibility
@@ -208,7 +300,7 @@ export class GameService {
       if (availableFreeGames.length > 0) {
         return {
           success: true,
-          message: `You can create ${availableFreeGames.length === 2 ? 'both' : 'one more'} free game${availableFreeGames.length === 2 ? 's' : ''}! Available: ${availableFreeGames.map(g => g.replace('_', ' ')).join(' and ')}.`,
+          message: `You can create ${availableFreeGames.length === 2 ? 'both' : 'one more'} free game${availableFreeGames.length === 2 ? 's' : ''}! Available: ${availableFreeGames.map((g) => g.replace('_', ' ')).join(' and ')}.`,
           data: {
             can_create_game: true,
             has_free_games_available: true,
@@ -233,7 +325,8 @@ export class GameService {
       if (!activeSubscription) {
         return {
           success: true,
-          message: 'You have used your free games for both game types. A subscription is required to create more games.',
+          message:
+            'You have used your free games for both game types. A subscription is required to create more games.',
           data: {
             can_create_game: false,
             has_free_games_available: false,
@@ -246,13 +339,17 @@ export class GameService {
       }
 
       // Check subscription limits
-      const gamesRemaining = activeSubscription.subscription_type.games - activeSubscription.games_played_count;
-      const hasUnlimitedGames = activeSubscription.subscription_type.games === -1;
+      const gamesRemaining =
+        activeSubscription.subscription_type.games -
+        activeSubscription.games_played_count;
+      const hasUnlimitedGames =
+        activeSubscription.subscription_type.games === -1;
 
       if (!hasUnlimitedGames && gamesRemaining <= 0) {
         return {
           success: true,
-          message: 'Your subscription has no remaining games. Please upgrade or renew your subscription.',
+          message:
+            'Your subscription has no remaining games. Please upgrade or renew your subscription.',
           data: {
             can_create_game: false,
             has_free_games_available: false,
@@ -304,8 +401,8 @@ export class GameService {
           { status: { contains: searchQuery, mode: 'insensitive' } },
           {
             language: {
-              name: { contains: searchQuery, mode: 'insensitive' }
-            }
+              name: { contains: searchQuery, mode: 'insensitive' },
+            },
           },
         ];
       }
@@ -340,7 +437,9 @@ export class GameService {
 
       return {
         success: true,
-        message: games.length ? 'Games retrieved successfully' : 'No games found',
+        message: games.length
+          ? 'Games retrieved successfully'
+          : 'No games found',
         data: games,
       };
     } catch (error) {
@@ -546,13 +645,29 @@ export class GameService {
 
       // Calculate aggregate statistics
       const totalQuestions = stats.game_players.reduce(
-        (sum, player) => sum + player.correct_answers + player.wrong_answers + player.skipped_answers,
-        0
+        (sum, player) =>
+          sum +
+          player.correct_answers +
+          player.wrong_answers +
+          player.skipped_answers,
+        0,
       );
-      const totalCorrect = stats.game_players.reduce((sum, player) => sum + player.correct_answers, 0);
-      const totalWrong = stats.game_players.reduce((sum, player) => sum + player.wrong_answers, 0);
-      const totalSkipped = stats.game_players.reduce((sum, player) => sum + player.skipped_answers, 0);
-      const totalScore = stats.game_players.reduce((sum, player) => sum + player.score, 0);
+      const totalCorrect = stats.game_players.reduce(
+        (sum, player) => sum + player.correct_answers,
+        0,
+      );
+      const totalWrong = stats.game_players.reduce(
+        (sum, player) => sum + player.wrong_answers,
+        0,
+      );
+      const totalSkipped = stats.game_players.reduce(
+        (sum, player) => sum + player.skipped_answers,
+        0,
+      );
+      const totalScore = stats.game_players.reduce(
+        (sum, player) => sum + player.score,
+        0,
+      );
 
       const aggregatedStats = {
         ...stats,
@@ -562,8 +677,12 @@ export class GameService {
           total_wrong: totalWrong,
           total_skipped: totalSkipped,
           total_score: totalScore,
-          accuracy_rate: totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0,
-          average_score: stats._count.game_players > 0 ? totalScore / stats._count.game_players : 0,
+          accuracy_rate:
+            totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0,
+          average_score:
+            stats._count.game_players > 0
+              ? totalScore / stats._count.game_players
+              : 0,
         },
       };
 
