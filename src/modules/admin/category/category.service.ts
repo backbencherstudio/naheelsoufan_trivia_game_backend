@@ -42,7 +42,12 @@ export class CategoryService {
       });
 
       if (category && category.image) {
-        category['image'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+        // Check if image is already a URL (starts with https)
+        if (category.image.startsWith('https')) {
+          category['image_url'] = category.image;
+        } else {
+          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+        }
       }
 
       return {
@@ -106,7 +111,12 @@ export class CategoryService {
       // Add image URLs if the image is available
       for (const category of categories) {
         if (category.image) {
-          category['image'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+          // Check if image is already a URL (starts with https)
+          if (category.image.startsWith('https')) {
+            category['image_url'] = category.image;
+          } else {
+            category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+          }
         }
       }
 
@@ -170,7 +180,12 @@ export class CategoryService {
       });
 
       if (category && category.image) {
-        category['image'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+        // Check if image is already a URL (starts with https)
+        if (category.image.startsWith('https')) {
+          category['image_url'] = category.image;
+        } else {
+          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+        }
       }
 
       return {
@@ -224,7 +239,12 @@ export class CategoryService {
       });
 
       if (updatedCategory && updatedCategory.image) {
-        updatedCategory['image'] = SojebStorage.url(appConfig().storageUrl.category + updatedCategory.image);
+        // Check if image is already a URL (starts with https)
+        if (updatedCategory.image.startsWith('https')) {
+          updatedCategory['image_url'] = updatedCategory.image;
+        } else {
+          updatedCategory['image_url'] = SojebStorage.url(appConfig().storageUrl.category + updatedCategory.image);
+        }
       }
 
       return {
@@ -305,15 +325,42 @@ export class CategoryService {
 
         try {
           // Validate required fields
-          if (!categoryData.name || !categoryData.language.id) {
+          if (!categoryData.name || !categoryData.language) {
             throw new Error(`Missing required fields in category ${i + 1}`);
+          }
+
+          // Handle language - find existing or create new
+          let languageId;
+          if (typeof categoryData.language === 'string') {
+            // Language is provided as string (e.g., "English")
+            const existingLanguage = await this.prisma.language.findFirst({
+              where: { name: categoryData.language }
+            });
+
+            if (existingLanguage) {
+              languageId = existingLanguage.id;
+            } else {
+              // Create new language with default code
+              const newLanguage = await this.prisma.language.create({
+                data: {
+                  name: categoryData.language,
+                  code: categoryData.language.toLowerCase().substring(0, 2), // Default code from first 2 chars
+                },
+              });
+              languageId = newLanguage.id;
+            }
+          } else if (typeof categoryData.language === 'object' && categoryData.language.id) {
+            // Language is provided as object with id (backward compatibility)
+            languageId = categoryData.language.id;
+          } else {
+            throw new Error(`Invalid language format in category ${i + 1}`);
           }
 
           // Create category
           await this.prisma.category.create({
             data: {
               name: categoryData.name,
-              language_id: categoryData.language.id,
+              language_id: languageId,
               image: categoryData.image || null,
             },
           });
@@ -369,7 +416,12 @@ export class CategoryService {
       // Add image URLs if available
       for (const category of categories) {
         if (category.image) {
-          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+          // Check if image is already a URL (starts with https)
+          if (category.image.startsWith('https')) {
+            category['image_url'] = category.image;
+          } else {
+            category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
+          }
         }
       }
 
@@ -378,11 +430,7 @@ export class CategoryService {
         name: category.name,
         image: category.image,
         image_url: category['image_url'],
-        language: {
-          id: category.language.id,
-          name: category.language.name,
-          code: category.language.code,
-        },
+        language: category.language.name
       }));
 
       return {

@@ -589,29 +589,13 @@ export class QuestionService {
       // Format data for export
       const exportData = questions.map(question => ({
         text: question.text,
-        category: {
-          id: question.category.id,
-          name: question.category.name,
-          image: question.category.image,
-          image_url: question.category['image_url'],
-        },
-        language: {
-          id: question.language.id,
-          name: question.language.name,
-          code: question.language.code,
-        },
-        difficulty: {
-          id: question.difficulty.id,
-          name: question.difficulty.name,
-        },
-        question_type: {
-          id: question.question_type.id,
-          name: question.question_type.name,
-        },
+        category: question.category.name,
+        language: question.language.name,
+        difficulty: question.difficulty.name,
+        question_type: question.question_type.name,
         time: question.time,
         points: question.points,
         free_bundle: question.free_bundle,
-        firebase: question.firebase,
         file_url: question.file_url,
         question_file_url: question['question_file_url'],
         answers: question.answers.map(answer => ({

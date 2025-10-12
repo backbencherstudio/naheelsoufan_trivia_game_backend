@@ -37,10 +37,10 @@ export class GameService {
     }
   }
 
-  // Get all games with optional search
-  async findAll(searchQuery: string | null) {
+  // Get all games with optional search and pagination
+  async findAll(searchQuery: string | null, page: number, limit: number) {
     try {
-      const whereClause = {};
+      const whereClause: any = {};
       if (searchQuery) {
         const searchConditions: any[] = [
           { status: { contains: searchQuery, mode: 'insensitive' } },
@@ -64,8 +64,14 @@ export class GameService {
         whereClause['OR'] = searchConditions;
       }
 
+      const total = await this.prisma.game.count({
+        where: whereClause,
+      });
+
       const games = await this.prisma.game.findMany({
         where: whereClause,
+        skip: (page - 1) * limit,
+        take: limit,
         select: {
           id: true,
           mode: true,
@@ -105,16 +111,27 @@ export class GameService {
             },
           },
         },
-
         orderBy: {
           created_at: 'desc',
         },
       });
 
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
       return {
         success: true,
         message: games.length ? 'Games retrieved successfully' : 'No games found',
         data: games,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
       };
     } catch (error) {
       return {
