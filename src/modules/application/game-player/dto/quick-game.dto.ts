@@ -94,7 +94,6 @@ export class AddMultipleQuickGamePlayersDto {
 
   @IsArray()
   @ArrayMinSize(2, { message: 'At least 2 players are required' })
-  @ArrayMaxSize(4, { message: 'Maximum 4 players allowed' })
   @IsString({ each: true })
   player_names: string[];
 }

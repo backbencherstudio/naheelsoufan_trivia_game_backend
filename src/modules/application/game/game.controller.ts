@@ -53,11 +53,11 @@ export class GameController {
     try {
       const user_id = req.user.userId;
       const game = await this.gameService.create(createGameDto, user_id);
-      return game; // Return the created game data
+      return game;
     } catch (error) {
       return {
         success: false,
-        message: error.message, // Return error message if creation fails
+        message: error.message,
       };
     }
   }
@@ -66,13 +66,13 @@ export class GameController {
   @Get()
   async findAll(@Query() query: { q?: string }) {
     try {
-      const searchQuery = query.q; // Optional search query
-      const games = await this.gameService.findAll(searchQuery); // Fetch all games
+      const searchQuery = query.q;
+      const games = await this.gameService.findAll(searchQuery);
       return games;
     } catch (error) {
       return {
         success: false,
-        message: error.message, // Return error message if fetching fails
+        message: error.message,
       };
     }
   }
@@ -81,28 +81,28 @@ export class GameController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {
-      const game = await this.gameService.findOne(id); // Fetch a game by ID
+      const game = await this.gameService.findOne(id);
       return game;
     } catch (error) {
       return {
         success: false,
-        message: error.message, // Return error message if fetching fails
+        message: error.message,
       };
     }
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN) // Restrict to admin roles
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Update a game' })
   @Patch(':id')
   async update(@Param('id') id: string, @Body() updateGameDto: UpdateGameDto) {
     try {
       const game = await this.gameService.update(id, updateGameDto);
-      return game; // Return updated game data
+      return game;
     } catch (error) {
       return {
         success: false,
-        message: error.message, // Return error message if updating fails
+        message: error.message,
       };
     }
   }
@@ -142,7 +142,6 @@ export class GameController {
   async GetPlayerGames(@Req() req: any) {
     try {
       const user_id = req.user.userId;
-      console.log(user_id);
       const allGames = await this.gameService.playerGames(user_id);
       return allGames;
     } catch (error) {

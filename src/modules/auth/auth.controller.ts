@@ -159,28 +159,27 @@ export class AuthController {
 
   // apple login
   @Get('apple')
-@UseGuards(AppleAuthGuard)
-async appleAuth(@Req() req) {
-  return HttpStatus.OK;
-}
+  @UseGuards(AppleAuthGuard)
+  async appleAuth(@Req() req) {
+    return HttpStatus.OK;
+  }
 
-@Get('apple/redirect')
-@UseGuards(AppleAuthGuard)
-async appleAuthRedirect(@Req() req, @Res() res: Response) {
-  const { user, loginResponse } = req.user;
+  @Get('apple/redirect')
+  @UseGuards(AppleAuthGuard)
+  async appleAuthRedirect(@Req() req, @Res() res: Response) {
+    const { user, loginResponse } = req.user;
 
-  return res.json({
-    message: 'Logged in successfully via Apple',
-    authorization: loginResponse.authorization,
-    user: {
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      avatar: user.avatar,
-    },
-  });
-}
-
+    return res.json({
+      message: 'Logged in successfully via Apple',
+      authorization: loginResponse.authorization,
+      user: {
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        avatar: user.avatar,
+      },
+    });
+  }
 
   // update user
   @ApiOperation({ summary: 'Update user' })
@@ -246,6 +245,7 @@ async appleAuthRedirect(@Req() req, @Res() res: Response) {
     try {
       const email = data.email;
       const token = data.token;
+      console.log('email', email, 'token:', token);
       if (!email) {
         throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
       }

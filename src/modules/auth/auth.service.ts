@@ -230,9 +230,22 @@ export class AuthService {
 
   async login({ email, userId }) {
     try {
+      const user = await UserRepository.getUserDetails(userId);
+      if (!user) {
+        throw new Error('User not found.');
+      }
+
+      if (!user.email_verified_at) {
+        return {
+          success: false,
+          message: 'Your email is not verified. Please check your inbox.',
+          data: {
+            requires_verification: true,
+          },
+        };
+      }
       const payload = { email: email, sub: userId };
       const token = this.jwtService.sign(payload);
-      const user = await UserRepository.getUserDetails(userId);
 
       return {
         success: true,
