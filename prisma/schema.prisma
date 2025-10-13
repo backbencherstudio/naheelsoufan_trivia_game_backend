@@ -415,6 +415,7 @@ model Subscription {
   payment_provider_charge      Decimal? // e.g. stripe payment provider charge
 
   // Relations
+  games                Game[]
   user                 User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
   subscription_type    SubscriptionType     @relation(fields: [subscription_type_id], references: [id])
   payment_transactions PaymentTransaction[]
@@ -453,6 +454,10 @@ model Game {
   current_question  Int           @default(0) // Current question number
   question_asked_at DateTime?
   // Relations
+
+  subscription_id   String?
+  subscription      Subscription? @relation(fields: [subscription_id], references: [id])
+
   game_players      GamePlayer[] // Players in this game
   rooms             Room[]
   leaderboards      Leaderboard[]

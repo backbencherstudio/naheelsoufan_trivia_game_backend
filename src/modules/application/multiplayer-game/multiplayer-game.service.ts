@@ -211,6 +211,15 @@ export class MultiplayerGameService {
       _count: {
         select: { game_players: true },
       },
+      game: {
+        include: {
+          subscription: {
+            include: {
+              subscription_type: true,
+            },
+          },
+        },
+      },
     };
 
     if (identifier.length === 8) {
@@ -252,7 +261,6 @@ export class MultiplayerGameService {
           'You cannot rejoin because you have already participated in the game.',
         );
       }
-
       return {
         success: true,
         message: 'Rejoined the game successfully.',
@@ -263,7 +271,20 @@ export class MultiplayerGameService {
       };
     }
 
-    if (room._count.game_players >= (isMaxLimit || 4)) {
+    let maxPlayers: number;
+
+    if (isMaxLimit) {
+      maxPlayers = isMaxLimit;
+    } else if (
+      room.game?.subscription &&
+      room.game.subscription.subscription_type.players > 0
+    ) {
+      maxPlayers = room.game.subscription.subscription_type.players;
+    } else {
+      maxPlayers = 4;
+    }
+
+    if (room._count.game_players >= isMaxLimit) {
       throw new BadRequestException('This room is already full.');
     }
 

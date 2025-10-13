@@ -2422,6 +2422,11 @@ export class GamePlayerService {
           _count: {
             select: { game_players: true },
           },
+          subscription: {
+            include: {
+              subscription_type: true,
+            },
+          },
         },
       });
 
@@ -2429,8 +2434,18 @@ export class GamePlayerService {
         throw new NotFoundException('Game not found');
       }
 
-      // Check if adding all players would exceed max limit
-      const maxPlayers = isMaxLimit ?? 4; // Quick Game max
+      let maxPlayers: number;
+
+      if (isMaxLimit) {
+        maxPlayers = isMaxLimit;
+      } else if (
+        game.subscription &&
+        game.subscription.subscription_type.players > 0
+      ) {
+        maxPlayers = game.subscription.subscription_type.players;
+      } else {
+        maxPlayers = 4;
+      }
       const totalPlayersAfterAdding =
         game._count.game_players + playerNames.length;
       if (totalPlayersAfterAdding > maxPlayers) {
@@ -3069,11 +3084,28 @@ export class GamePlayerService {
         }
       }
 
-      if (isRoundOver) {
+      const isGameOver =
+        game.total_questions > 0 &&
+        game.current_question >= game.total_questions;
+
+      if (isGameOver) {
         await this.prisma.game.update({
           where: { id: gameId },
-          data: { status: 'COMPLETED', game_phase: 'ROUND_OVER' },
+          data: { status: 'COMPLETED', game_phase: 'GAME_OVER' },
         });
+
+        return {
+          success: true,
+          message:
+            'The final question has been answered. The game is now complete!',
+          data: {
+            is_correct: isCorrect,
+            player_score: updatedPlayer.score,
+            next_action: 'GAME_OVER',
+            all_players_history: allPlayersHistory,
+            is_game_over: true,
+          },
+        };
       }
 
       if (isCorrect) {
@@ -3337,6 +3369,11 @@ export class GamePlayerService {
           },
           game_questions: true,
           rooms: true,
+          subscription: {
+            include: {
+              subscription_type: true,
+            },
+          },
         },
       });
 
@@ -3347,6 +3384,42 @@ export class GamePlayerService {
       if (game.game_players.length === 0) {
         throw new BadRequestException(
           'No players have been added to this game yet.',
+        );
+      }
+
+      // --- new logic ---
+      if (game.current_question === 0) {
+        let totalQuestionsForGame;
+        const numberOfPlayers = game.game_players.length;
+
+        if (
+          game.subscription &&
+          game.subscription.subscription_type.questions > 0
+        ) {
+          totalQuestionsForGame =
+            game.subscription.subscription_type.questions * numberOfPlayers;
+        } else {
+          totalQuestionsForGame = numberOfPlayers;
+        }
+
+        await this.prisma.game.update({
+          where: { id: gameId },
+          data: { total_questions: totalQuestionsForGame },
+        });
+        game.total_questions = totalQuestionsForGame;
+      }
+
+      if (
+        game.total_questions > 0 &&
+        game.current_question >= game.total_questions
+      ) {
+        await this.prisma.game.update({
+          where: { id: gameId },
+          data: { status: 'completed', game_phase: 'GAME_OVER' },
+        });
+
+        throw new BadRequestException(
+          'The game is complete. No more questions can be played.',
         );
       }
 
@@ -3447,7 +3520,10 @@ export class GamePlayerService {
           player_order: currentPlayer.player_order,
         },
         game_info: {
+          total_question_number: game.total_questions,
           current_question_number: game.current_question + 1,
+          remainig_qustion_number:
+            game.total_questions - game.current_question - 1,
         },
       };
 
@@ -3464,7 +3540,6 @@ export class GamePlayerService {
         data: responseData,
       };
     } catch (error) {
-      // NestJS-এর ডিফল্ট এরর হ্যান্ডলিং ব্যবহার করা ভালো
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException

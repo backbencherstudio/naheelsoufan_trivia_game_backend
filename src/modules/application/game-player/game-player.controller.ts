@@ -730,18 +730,12 @@ export class GamePlayerController {
     @Req() req: any,
   ) {
     try {
-      // টোকেন থেকে আসা userId এবং DTO থেকে আসা playerId একই কিনা তা নিশ্চিত করা যেতে পারে (ঐচ্ছিক নিরাপত্তা স্তর)
-      // const requestingUserId = req.user.userId;
-      // এখানে আরও লজিক যোগ করা যেতে পারে যে, শুধুমাত্র গেমের হোস্ট বা বর্তমান প্লেয়ারই এই কল করতে পারবে।
-      // আপাতত, আমরা ধরে নিচ্ছি যেকোনো অথেনটিকেটেড ইউজার এটি করতে পারে।
-
       return await this.gamePlayerService.handleQuestionTimeout(
         timeoutDto.game_id,
         timeoutDto.question_id,
         timeoutDto.player_id,
       );
     } catch (error) {
-      // সাধারণ এরর হ্যান্ডলিং
       return {
         success: false,
         message: error.message,

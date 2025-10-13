@@ -148,7 +148,7 @@ export class SubscriptionService {
       status: activeSubscription.status,
       is_active: activeSubscription.status === 'active',
       can_play_games:
-        gamesRemaining > 0 || activeSubscription.subscription_type.games === -1, // -1 means unlimited
+        gamesRemaining > 0 || activeSubscription.subscription_type.games === -1,
       games_remaining:
         activeSubscription.subscription_type.games === -1
           ? undefined
@@ -213,8 +213,6 @@ export class SubscriptionService {
       where: { id: user_id },
     });
 
-    console.log('user id', user.id);
-
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -224,7 +222,7 @@ export class SubscriptionService {
       data: {
         user_id,
         subscription_type_id: dto.subscription_type_id,
-        status: 'pending', // Will be updated when payment succeeds
+        status: 'pending',
         payment_status: 'pending',
         payment_provider: 'stripe',
       },

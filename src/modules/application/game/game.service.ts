@@ -17,7 +17,7 @@ export class GameService {
           mode: createGameDto.mode,
         },
       });
-
+      let activeSubscriptionId: string | null = null;
       // Get total games created (for tracking purposes)
       const totalGamesCount = await this.prisma.game.count({
         where: {
@@ -81,6 +81,7 @@ export class GameService {
             },
           };
         }
+        activeSubscriptionId = activeSubscription.id;
       }
 
       // Create the game
@@ -88,6 +89,7 @@ export class GameService {
         data: {
           ...createGameDto,
           host_id: user_id,
+          subscription_id: activeSubscriptionId,
         },
         select: {
           id: true,
@@ -107,21 +109,10 @@ export class GameService {
 
       // If user has a subscription and this is not their first game of this type, increment the games played count
       if (gamesOfThisType > 0) {
-        const activeSubscription = await this.prisma.subscription.findFirst({
-          where: {
-            user_id,
-            status: 'active',
-          },
-        });
-
-        if (activeSubscription) {
+        if (activeSubscriptionId) {
           await this.prisma.subscription.update({
-            where: { id: activeSubscription.id },
-            data: {
-              games_played_count: {
-                increment: 1,
-              },
-            },
+            where: { id: activeSubscriptionId },
+            data: { games_played_count: { increment: 1 } },
           });
         }
       }
