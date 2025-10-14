@@ -2927,17 +2927,22 @@ export class GamePlayerService {
     try {
       const game = await this.prisma.game.findUnique({
         where: { id: gameId },
-        include: { game_players: { orderBy: { player_order: 'asc' } } },
+        include: {
+          game_players: { orderBy: { player_order: 'asc' } },
+          rooms: true,
+        },
       });
 
       if (!game) {
         return { success: false, message: 'Game not found', statusCode: 404 };
       }
 
+      const isMultiPhoneGame = game.rooms && game.rooms.length > 0;
+      const roomId = isMultiPhoneGame ? game.rooms[0].id : null;
       const isStealMode = game.current_player_id === null;
 
       if (isStealMode) {
-        // for same player attemt to steal question
+        // for same player attempt to steal question
         const answerers = await this.prisma.playerAnswer.findMany({
           where: { question_id: questionId, game_player: { game_id: gameId } },
           orderBy: { created_at: 'asc' },
@@ -3094,7 +3099,7 @@ export class GamePlayerService {
           data: { status: 'COMPLETED', game_phase: 'GAME_OVER' },
         });
 
-        return {
+        const gameOverResponse = {
           success: true,
           message:
             'The final question has been answered. The game is now complete!',
@@ -3106,24 +3111,56 @@ export class GamePlayerService {
             is_game_over: true,
           },
         };
+
+        if (isMultiPhoneGame) {
+          this.gatway.emitAnswerResult(roomId, gameOverResponse.data);
+        }
+        return gameOverResponse;
       }
 
       if (isCorrect) {
-        const firstAnswerer = await this.prisma.playerAnswer.findFirst({
-          where: { question_id: questionId, game_player: { game_id: gameId } },
-          orderBy: { created_at: 'asc' },
-        });
-        let nextTurnPlayer = firstAnswerer;
+        let nextTurnPlayer;
+        if (isStealMode) {
+          const firstAnswerer = await this.prisma.playerAnswer.findFirst({
+            where: {
+              question_id: questionId,
+              game_player: { game_id: gameId },
+            },
+            orderBy: { created_at: 'asc' },
+          });
+          let originalPlayerIndex = -1;
+          if (firstAnswerer) {
+            originalPlayerIndex = game.game_players.findIndex(
+              (p) => p.id === firstAnswerer.game_player_id,
+            );
+          }
+          if (originalPlayerIndex !== -1) {
+            nextTurnPlayer =
+              game.game_players[
+                (originalPlayerIndex + 1) % game.game_players.length
+              ];
+          } else {
+            nextTurnPlayer = game.game_players[0];
+          }
+        } else {
+          const currentPlayerIndex = game.game_players.findIndex(
+            (p) => p.id === playerId,
+          );
+          nextTurnPlayer =
+            game.game_players[
+              (currentPlayerIndex + 1) % game.game_players.length
+            ];
+        }
 
         await this.prisma.game.update({
           where: { id: gameId },
           data: {
             game_phase: 'ROUND_COMPLETED',
-            current_player_id: firstAnswerer.game_player_id,
+            current_player_id: nextTurnPlayer.id,
           },
         });
 
-        return {
+        const successResponse = {
           success: true,
           message: isStealMode
             ? `Successful steal by ${player.player_name}!`
@@ -3137,36 +3174,49 @@ export class GamePlayerService {
             player_id: playerId,
             player_name: player.player_name,
             next_turn_for: {
-              // it will be for another task
-              player_id: nextTurnPlayer.game_player_id,
-              // player_name: nextTurnPlayer.player_name,
-              // player_order: nextTurnPlayer.player_order,
+              player_id: nextTurnPlayer.id,
+              player_name: nextTurnPlayer.player_name,
             },
             all_players_history: allPlayersHistory,
             is_round_over: isRoundOver,
           },
         };
+
+        if (isMultiPhoneGame) {
+          this.gatway.emitAnswerResult(roomId, successResponse.data);
+        }
+        return successResponse;
       } else {
         if (isStealMode) {
           const firstAnswerer = await this.prisma.playerAnswer.findFirst({
             where: {
               question_id: questionId,
-              game_player: {
-                game_id: gameId,
-              },
+              game_player: { game_id: gameId },
             },
             orderBy: { created_at: 'asc' },
           });
+          let nextPlayerForNewQuestion = game.game_players[0];
+          if (firstAnswerer) {
+            const originalPlayerIndex = game.game_players.findIndex(
+              (p) => p.id === firstAnswerer.game_player_id,
+            );
+            if (originalPlayerIndex !== -1) {
+              nextPlayerForNewQuestion =
+                game.game_players[
+                  (originalPlayerIndex + 1) % game.game_players.length
+                ];
+            }
+          }
 
           await this.prisma.game.update({
             where: { id: gameId },
             data: {
               game_phase: 'ROUND_COMPLETED',
-              current_player_id: firstAnswerer.game_player_id,
+              current_player_id: nextPlayerForNewQuestion.id,
             },
           });
 
-          return {
+          const stealFailResponse = {
             success: true,
             message: 'Incorrect steal attempt. Moving to the next round.',
             data: {
@@ -3178,19 +3228,23 @@ export class GamePlayerService {
                 text: correctAnswer?.text,
               },
               next_action: 'SELECT_NEW_QUESTION_FOR_NEXT_PLAYER',
-              // need to update here
-              next_player_id: firstAnswerer.game_player_id,
+              next_player_id: nextPlayerForNewQuestion.id,
               all_players_history: allPlayersHistory,
               is_round_over: isRoundOver,
             },
           };
+
+          if (isMultiPhoneGame) {
+            this.gatway.emitAnswerResult(roomId, stealFailResponse.data);
+          }
+          return stealFailResponse;
         } else {
           await this.prisma.game.update({
             where: { id: gameId },
             data: { current_player_id: null, game_phase: 'STEAL_MODE_ACTIVE' },
           });
 
-          return {
+          const openForStealResponse = {
             success: true,
             message: `Wrong answer! The question is now open for anyone to steal.`,
             data: {
@@ -3212,9 +3266,15 @@ export class GamePlayerService {
               all_players_history: allPlayersHistory,
             },
           };
+
+          if (isMultiPhoneGame) {
+            this.gatway.emitAnswerResult(roomId, openForStealResponse.data);
+          }
+          return openForStealResponse;
         }
       }
     } catch (error) {
+      console.error('Error in answerCompetitiveQuestion:', error);
       return {
         success: false,
         message: 'An unexpected error occurred while answering the question.',
@@ -3387,6 +3447,9 @@ export class GamePlayerService {
         );
       }
 
+      // Check if game is free and validate free_bundle
+      const isFreeGame = !game.subscription;
+
       // --- new logic ---
       if (game.current_question === 0) {
         let totalQuestionsForGame;
@@ -3436,11 +3499,20 @@ export class GamePlayerService {
         currentPlayer = game.game_players[nextPlayerIndex];
       }
 
+      // Build where condition for questions
+      const whereCondition: any = {
+        category_id: categoryId,
+        difficulty_id: difficultyId,
+      };
+
+      // If it's a free game, only include questions with free_bundle: true
+      if (isFreeGame) {
+        whereCondition.free_bundle = true;
+      }
+      // For subscription games, no free_bundle restriction
+
       const allQuestions = await this.prisma.question.findMany({
-        where: {
-          category_id: categoryId,
-          difficulty_id: difficultyId,
-        },
+        where: whereCondition,
         include: {
           answers: {
             select: { id: true, text: true, file_url: true, is_correct: true },
@@ -3452,9 +3524,15 @@ export class GamePlayerService {
       });
 
       if (!allQuestions.length) {
-        throw new BadRequestException(
-          'No questions available for selected category and difficulty',
-        );
+        if (isFreeGame) {
+          throw new BadRequestException(
+            'No free questions available for selected category and difficulty',
+          );
+        } else {
+          throw new BadRequestException(
+            'No questions available for selected category and difficulty',
+          );
+        }
       }
 
       const usedQuestionIds = game.game_questions.map((q) => q.question_id);
@@ -3463,9 +3541,15 @@ export class GamePlayerService {
       );
 
       if (!availableQuestions.length) {
-        throw new BadRequestException(
-          'All questions for this category/difficulty have already been used in this game',
-        );
+        if (isFreeGame) {
+          throw new BadRequestException(
+            'All free questions for this category/difficulty have already been used in this game',
+          );
+        } else {
+          throw new BadRequestException(
+            'All questions for this category/difficulty have already been used in this game',
+          );
+        }
       }
 
       const selectedQuestion =

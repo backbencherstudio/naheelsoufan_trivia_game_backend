@@ -10,15 +10,7 @@ export class GameService {
   // Create a new game with subscription validation
   async create(createGameDto: CreateGameDto, user_id: string) {
     try {
-      // Check how many games the user has created for this specific game type
-      const gamesOfThisType = await this.prisma.game.count({
-        where: {
-          host_id: user_id,
-          mode: createGameDto.mode,
-        },
-      });
-      let activeSubscriptionId: string | null = null;
-      // Get total games created (for tracking purposes)
+      // Check total games created across all types
       const totalGamesCount = await this.prisma.game.count({
         where: {
           host_id: user_id,
@@ -28,8 +20,13 @@ export class GameService {
         },
       });
 
-      // If this is not the first game of this type, check for subscription
-      if (gamesOfThisType > 0) {
+      let activeSubscriptionId: string | null = null;
+      let requiresSubscription = false;
+
+      // If user has already created any game (free one used), check for subscription
+      if (totalGamesCount > 0) {
+        requiresSubscription = true;
+
         // Check if user has an active subscription
         const activeSubscription = await this.prisma.subscription.findFirst({
           where: {
@@ -48,7 +45,6 @@ export class GameService {
             message: `No games remaining in your subscription. Please upgrade or purchase a new subscription.`,
             data: {
               requires_subscription: true,
-              games_of_this_type: gamesOfThisType,
               total_games_created: totalGamesCount,
               game_type: createGameDto.mode,
               game_types_created: gameTypesCreated,
@@ -60,6 +56,7 @@ export class GameService {
         const gamesRemaining =
           activeSubscription.subscription_type.games -
           activeSubscription.games_played_count;
+
         if (
           activeSubscription.subscription_type.games !== -1 &&
           gamesRemaining <= 0
@@ -84,6 +81,14 @@ export class GameService {
         activeSubscriptionId = activeSubscription.id;
       }
 
+      // Check games of this specific type (for informational purposes)
+      const gamesOfThisType = await this.prisma.game.count({
+        where: {
+          host_id: user_id,
+          mode: createGameDto.mode,
+        },
+      });
+
       // Create the game
       const game = await this.prisma.game.create({
         data: {
@@ -107,27 +112,25 @@ export class GameService {
         },
       });
 
-      // If user has a subscription and this is not their first game of this type, increment the games played count
-      if (gamesOfThisType > 0) {
-        if (activeSubscriptionId) {
-          await this.prisma.subscription.update({
-            where: { id: activeSubscriptionId },
-            data: { games_played_count: { increment: 1 } },
-          });
-        }
+      // If user has used their free game and has a subscription, increment the games played count
+      if (requiresSubscription && activeSubscriptionId) {
+        await this.prisma.subscription.update({
+          where: { id: activeSubscriptionId },
+          data: { games_played_count: { increment: 1 } },
+        });
       }
 
       const gameTypesCreated = await this.getGameTypesCreated(user_id);
-      const isFirstGameOfType = gamesOfThisType === 0;
+      const isFirstGameOverall = totalGamesCount === 0;
 
       return {
         success: true,
-        message: isFirstGameOfType
-          ? `Congratulations! Your first ${createGameDto.mode.replace('_', ' ')} game created successfully (FREE). You can also create one free game of the other type.`
+        message: isFirstGameOverall
+          ? `Congratulations! Your first free game created successfully. You can create one free game of any type.`
           : `${createGameDto.mode.replace('_', ' ')} game created successfully using your subscription.`,
         data: {
           ...game,
-          is_first_game_of_type: isFirstGameOfType,
+          is_first_game_overall: isFirstGameOverall,
           games_of_this_type: gamesOfThisType + 1,
           total_games_created: totalGamesCount + 1,
           game_types_created: {
