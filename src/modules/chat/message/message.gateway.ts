@@ -304,4 +304,14 @@ export class MessageGateway
     this.server.to(roomId).emit('newQuestionReady', data);
     console.log(`Emitted newQuestionReady event to room ${roomId}`);
   }
+
+  emitAnswerResult(roomId: string, data: any) {
+    this.server.to(roomId).emit('answerResult', data);
+    console.log(`Emitted answerResult event to room ${roomId}`);
+  }
+
+  emitGameOver(roomId: string, data: any) {
+    this.server.to(roomId).emit('gameOver', data);
+    console.log(`Emitted gameOver event to room ${roomId}`);
+  }
 }

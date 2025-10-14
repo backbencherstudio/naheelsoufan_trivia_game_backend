@@ -25,15 +25,24 @@ export class MultiplayerGameService {
    */
   async createGame(createDto: CreateMultiplayerGameDto, hostId: string) {
     try {
-      const gamesOfThisType = await this.prisma.game.count({
+      // Check total games created across all types
+      const totalGamesCount = await this.prisma.game.count({
         where: {
           host_id: hostId,
-          mode: createDto.mode,
+          mode: {
+            in: ['QUICK_GAME', 'GRID_STYLE'], // আপনার সব গেম মোড এখানে যোগ করুন
+          },
         },
       });
 
-      if (gamesOfThisType > 0) {
-        const activeSubscription = await this.prisma.subscription.findFirst({
+      let requiresSubscription = false;
+      let activeSubscription = null;
+
+      // If user has already created any game (free one used), check for subscription
+      if (totalGamesCount > 0) {
+        requiresSubscription = true;
+
+        activeSubscription = await this.prisma.subscription.findFirst({
           where: {
             user_id: hostId,
             status: 'active',
@@ -47,7 +56,10 @@ export class MultiplayerGameService {
           return {
             success: false,
             message: `No games remaining in your subscription. Please upgrade or purchase a new subscription.`,
-            data: { requires_subscription: true },
+            data: {
+              requires_subscription: true,
+              total_games_created: totalGamesCount,
+            },
           };
         }
 
@@ -68,22 +80,27 @@ export class MultiplayerGameService {
               subscription_exhausted: true,
               games_limit: gamesLimit,
               games_played: gamesPlayed,
+              total_games_created: totalGamesCount,
             },
           };
         }
       }
 
+      // Check games of this specific type (for informational purposes only)
+      const gamesOfThisType = await this.prisma.game.count({
+        where: {
+          host_id: hostId,
+          mode: createDto.mode,
+        },
+      });
+
       return this.prisma.$transaction(async (tx) => {
-        if (gamesOfThisType > 0) {
-          const subscriptionToUpdate = await tx.subscription.findFirst({
-            where: { user_id: hostId, status: 'active' },
+        // If user has used their free game and has a subscription, increment the games played count
+        if (requiresSubscription && activeSubscription) {
+          await tx.subscription.update({
+            where: { id: activeSubscription.id },
+            data: { games_played_count: { increment: 1 } },
           });
-          if (subscriptionToUpdate) {
-            await tx.subscription.update({
-              where: { id: subscriptionToUpdate.id },
-              data: { games_played_count: { increment: 1 } },
-            });
-          }
         }
 
         const game = await tx.game.create({
@@ -92,6 +109,10 @@ export class MultiplayerGameService {
             language_id: createDto.language_id,
             host_id: hostId,
             game_phase: 'waiting',
+            // Add subscription_id if using subscription
+            subscription_id: requiresSubscription
+              ? activeSubscription?.id
+              : null,
           },
         });
 
@@ -125,18 +146,20 @@ export class MultiplayerGameService {
           },
         });
 
-        const isFirstGameOfType = gamesOfThisType === 0;
+        const isFirstGameOverall = totalGamesCount === 0;
 
         return {
           success: true,
-          message: isFirstGameOfType
-            ? `Congratulations! Your first ${createDto.mode.replace('_', ' ')} game created successfully (FREE).`
+          message: isFirstGameOverall
+            ? `Congratulations! Your first free game created successfully. You can create one free game of any type.`
             : `${createDto.mode.replace('_', ' ')} game created successfully using your subscription.`,
           data: {
             game,
             room,
             hostPlayer,
-            is_first_game_of_type: isFirstGameOfType,
+            is_first_game_overall: isFirstGameOverall,
+            games_of_this_type: gamesOfThisType + 1,
+            total_games_created: totalGamesCount + 1,
           },
         };
       });
