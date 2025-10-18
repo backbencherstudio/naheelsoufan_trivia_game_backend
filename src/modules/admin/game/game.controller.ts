@@ -45,10 +45,12 @@ export class GameController {
 
   @ApiOperation({ summary: 'Read all games' })
   @Get()
-  async findAll(@Query() query: { q?: string }) {
+  async findAll(@Query() query: { q?: string; page?: string; limit?: string }) {
     try {
       const searchQuery = query.q;  // Optional search query
-      const games = await this.gameService.findAll(searchQuery);  // Fetch all games
+      const page = parseInt(query.page) || 1;  // Default page is 1
+      const limit = parseInt(query.limit) || 10;  // Default limit is 10
+      const games = await this.gameService.findAll(searchQuery, page, limit);  // Fetch games with pagination
       return games;
     } catch (error) {
       return {
@@ -72,7 +74,7 @@ export class GameController {
     }
   }
 
- 
+
   @ApiOperation({ summary: 'Update a game' })
   @Patch(':id')
   async update(
