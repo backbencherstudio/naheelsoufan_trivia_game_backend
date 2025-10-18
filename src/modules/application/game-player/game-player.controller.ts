@@ -13,28 +13,64 @@ import {
 import { GamePlayerService } from './game-player.service';
 import { JoinGameDto, LeaveGameDto } from './dto/join-game.dto';
 import { AnswerQuestionDto, SkipQuestionDto } from './dto/answer-question.dto';
-import { StartGameDto, EndGameDto, UpdateScoreDto, GetGameQuestionsDto } from './dto/gameplay.dto';
-import { StartTurnDto, SelectCategoryDto, AddGuestPlayerDto, GetGameStateDto, NextTurnDto, AnswerQuestionDto as GameFlowAnswerDto, StealQuestionDto as GameFlowStealQuestionDto, EndGameDto as GameFlowEndDto } from './dto/game-flow.dto';
-import { AddQuickGamePlayerDto, StartQuickGameDto, SelectQuickGameCategoryDto, AnswerQuickGameQuestionDto, StealQuickGameQuestionDto, EndQuickGameDto, GetQuickGameStatusDto, AddMultipleQuickGamePlayersDto, AddPlayersAndStartGameDto, SelectCompetitiveCategoryDto, AnswerCompetitiveQuestionDto, GetCompetitiveQuestionDto, GetCompetitiveGameStatusDto, HostSelectCategoryDto, HostAnswerQuestionDto, HostStealQuestionDto, HostSkipQuestionDto, HostStartGameDto, AddPlayersOnlyDto, SelectCategoryAndStartDto, PlayerAnswerQuestionDto, StealQuestionDto } from './dto/quick-game.dto';
+import {
+  StartGameDto,
+  EndGameDto,
+  UpdateScoreDto,
+  GetGameQuestionsDto,
+} from './dto/gameplay.dto';
+import {
+  StartTurnDto,
+  SelectCategoryDto,
+  AddGuestPlayerDto,
+  GetGameStateDto,
+  NextTurnDto,
+  AnswerQuestionDto as GameFlowAnswerDto,
+  StealQuestionDto as GameFlowStealQuestionDto,
+  EndGameDto as GameFlowEndDto,
+} from './dto/game-flow.dto';
+import {
+  AddQuickGamePlayerDto,
+  StartQuickGameDto,
+  SelectQuickGameCategoryDto,
+  AnswerQuickGameQuestionDto,
+  StealQuickGameQuestionDto,
+  EndQuickGameDto,
+  GetQuickGameStatusDto,
+  AddMultipleQuickGamePlayersDto,
+  AddPlayersAndStartGameDto,
+  SelectCompetitiveCategoryDto,
+  AnswerCompetitiveQuestionDto,
+  GetCompetitiveQuestionDto,
+  GetCompetitiveGameStatusDto,
+  HostSelectCategoryDto,
+  HostAnswerQuestionDto,
+  HostStealQuestionDto,
+  HostSkipQuestionDto,
+  HostStartGameDto,
+  AddPlayersOnlyDto,
+  SelectCategoryAndStartDto,
+  PlayerAnswerQuestionDto,
+  StealQuestionDto,
+} from './dto/quick-game.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { QuestionTimeoutDto } from './dto/question-timeout.dto';
 
 @ApiTags('Game Player')
 @Controller('game-players')
 @ApiBearerAuth()
 export class GamePlayerController {
-  constructor(private readonly gamePlayerService: GamePlayerService) { }
+  constructor(private readonly gamePlayerService: GamePlayerService) {}
 
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Join a game',
-    description: 'Join a game as a single user. If you are the host and provide user_ids, you can add multiple players when joining your own game.'
+    description:
+      'Join a game as a single user. If you are the host and provide user_ids, you can add multiple players when joining your own game.',
   })
   @Post('join')
-  async joinGame(
-    @Body() joinGameDto: JoinGameDto,
-    @Req() req: any,
-  ) {
+  async joinGame(@Body() joinGameDto: JoinGameDto, @Req() req: any) {
     const userId = req.user.userId;
     return await this.gamePlayerService.joinGame(userId, joinGameDto);
   }
@@ -42,13 +78,13 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Leave a game' })
   @Post('leave')
-  async leaveGame(
-    @Body() leaveGameDto: LeaveGameDto,
-    @Req() req: any,
-  ) {
+  async leaveGame(@Body() leaveGameDto: LeaveGameDto, @Req() req: any) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.leaveGame(userId, leaveGameDto);
+      const result = await this.gamePlayerService.leaveGame(
+        userId,
+        leaveGameDto,
+      );
       return result;
     } catch (error) {
       return {
@@ -61,13 +97,13 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get player statistics in a game' })
   @Get('stats/:gameId')
-  async getPlayerStats(
-    @Param('gameId') gameId: string,
-    @Req() req: any,
-  ) {
+  async getPlayerStats(@Param('gameId') gameId: string, @Req() req: any) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.getPlayerStats(userId, gameId);
+      const result = await this.gamePlayerService.getPlayerStats(
+        userId,
+        gameId,
+      );
       return result;
     } catch (error) {
       return {
@@ -77,6 +113,7 @@ export class GamePlayerController {
     }
   }
 
+  // Incomplete || not verified user
   @ApiOperation({ summary: 'Get all players in a game' })
   @Get('game/:gameId')
   async getGamePlayers(@Param('gameId') gameId: string) {
@@ -131,8 +168,10 @@ export class GamePlayerController {
 
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
-    summary: 'Get game questions with multiple categories, difficulty, and question count',
-    description: 'Retrieve questions from multiple selected categories with specified difficulty. Questions are distributed evenly across categories.'
+    summary:
+      'Get game questions with multiple categories, difficulty, and question count',
+    description:
+      'Retrieve questions from multiple selected categories with specified difficulty. Questions are distributed evenly across categories.',
   })
   @Get('get-questions/:gameId')
   async getGameQuestions(
@@ -141,7 +180,11 @@ export class GamePlayerController {
     @Req() req: any,
   ) {
     const userId = req.user.userId;
-    return await this.gamePlayerService.getGameQuestions(userId, gameId, questionsDto);
+    return await this.gamePlayerService.getGameQuestions(
+      userId,
+      gameId,
+      questionsDto,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -154,7 +197,10 @@ export class GamePlayerController {
   ) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.answerQuestion(gameId, answerDto);
+      const result = await this.gamePlayerService.answerQuestion(
+        gameId,
+        answerDto,
+      );
       return result;
     } catch (error) {
       return {
@@ -174,7 +220,11 @@ export class GamePlayerController {
   ) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.skipQuestion(userId, gameId, skipDto);
+      const result = await this.gamePlayerService.skipQuestion(
+        userId,
+        gameId,
+        skipDto,
+      );
       return result;
     } catch (error) {
       return {
@@ -187,13 +237,13 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get current game status for player' })
   @Get('status/:gameId')
-  async getGameStatus(
-    @Param('gameId') gameId: string,
-    @Req() req: any,
-  ) {
+  async getGameStatus(@Param('gameId') gameId: string, @Req() req: any) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.getPlayerStats(userId, gameId);
+      const result = await this.gamePlayerService.getPlayerStats(
+        userId,
+        gameId,
+      );
       return {
         ...result,
         message: 'Game status retrieved successfully',
@@ -209,16 +259,15 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get player ranking in game' })
   @Get('ranking/:gameId')
-  async getPlayerRanking(
-    @Param('gameId') gameId: string,
-    @Req() req: any,
-  ) {
+  async getPlayerRanking(@Param('gameId') gameId: string, @Req() req: any) {
     try {
       const userId = req.user.userId;
       const allPlayers = await this.gamePlayerService.getGamePlayers(gameId);
 
       if (allPlayers.success) {
-        const playerIndex = allPlayers.data.findIndex(p => p.user.id === userId);
+        const playerIndex = allPlayers.data.findIndex(
+          (p) => p.user.id === userId,
+        );
         const playerRank = playerIndex !== -1 ? playerIndex + 1 : null;
 
         return {
@@ -228,7 +277,7 @@ export class GamePlayerController {
             current_rank: playerRank,
             total_players: allPlayers.data.length,
             player_stats: allPlayers.data[playerIndex] || null,
-            top_3: allPlayers.data.slice(0, 3)
+            top_3: allPlayers.data.slice(0, 3),
           },
         };
       }
@@ -251,13 +300,13 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Start game with game ID' })
   @Post('start-game')
-  async startGame(
-    @Body() startGameDto: StartGameDto,
-    @Req() req: any,
-  ) {
+  async startGame(@Body() startGameDto: StartGameDto, @Req() req: any) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.startGame(userId, startGameDto);
+      const result = await this.gamePlayerService.startGame(
+        userId,
+        startGameDto,
+      );
       return result;
     } catch (error) {
       return {
@@ -268,12 +317,11 @@ export class GamePlayerController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'End game and show final rankings with leaderboard' })
+  @ApiOperation({
+    summary: 'End game and show final rankings with leaderboard',
+  })
   @Post('end-game')
-  async endGame(
-    @Body() endGameDto: EndGameDto,
-    @Req() req: any,
-  ) {
+  async endGame(@Body() endGameDto: EndGameDto, @Req() req: any) {
     try {
       const userId = req.user.userId;
       const result = await this.gamePlayerService.endGame(userId, endGameDto);
@@ -286,7 +334,9 @@ export class GamePlayerController {
     }
   }
 
-  @ApiOperation({ summary: 'Get comprehensive game results with rankings and leaderboard' })
+  @ApiOperation({
+    summary: 'Get comprehensive game results with rankings and leaderboard',
+  })
   @Get('results/:gameId')
   async getGameResults(@Param('gameId') gameId: string) {
     try {
@@ -341,16 +391,19 @@ export class GamePlayerController {
       if (!gameState.success) {
         return gameState;
       }
-      
-      const player = gameState.data.players.find(p => p.user_id === userId);
+
+      const player = gameState.data.players.find((p) => p.user_id === userId);
       if (!player) {
         return {
           success: false,
           message: 'Player not found in this game',
         };
       }
-      
-      return await this.gamePlayerService.startPlayerTurn(dto.game_id, player.id);
+
+      return await this.gamePlayerService.startPlayerTurn(
+        dto.game_id,
+        player.id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -394,7 +447,10 @@ export class GamePlayerController {
   @Post('add-guest-player')
   async addGuestPlayer(@Body() dto: AddGuestPlayerDto) {
     try {
-      return await this.gamePlayerService.addGuestPlayer(dto.game_id, dto.player_name);
+      return await this.gamePlayerService.addGuestPlayer(
+        dto.game_id,
+        dto.player_name,
+      );
     } catch (error) {
       return {
         success: false,
@@ -420,7 +476,10 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Remove guest player from game' })
   @Delete('remove-guest-player/:gameId/:playerId')
-  async removeGuestPlayer(@Param('gameId') gameId: string, @Param('playerId') playerId: string) {
+  async removeGuestPlayer(
+    @Param('gameId') gameId: string,
+    @Param('playerId') playerId: string,
+  ) {
     try {
       return await this.gamePlayerService.removeGuestPlayer(gameId, playerId);
     } catch (error) {
@@ -438,7 +497,10 @@ export class GamePlayerController {
   @Post('quick-game/add-player')
   async addQuickGamePlayer(@Body() dto: AddQuickGamePlayerDto) {
     try {
-      return await this.gamePlayerService.addQuickGamePlayer(dto.game_id, dto.player_name);
+      return await this.gamePlayerService.addQuickGamePlayer(
+        dto.game_id,
+        dto.player_name,
+      );
     } catch (error) {
       return {
         success: false,
@@ -480,7 +542,11 @@ export class GamePlayerController {
   @Post('quick-game/select-category')
   async selectQuickGameCategory(@Body() dto: SelectQuickGameCategoryDto) {
     try {
-      return await this.gamePlayerService.selectQuickGameCategory(dto.game_id, dto.category_id, dto.difficulty_id);
+      return await this.gamePlayerService.selectQuickGameCategory(
+        dto.game_id,
+        dto.category_id,
+        dto.difficulty_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -508,7 +574,11 @@ export class GamePlayerController {
   @Post('quick-game/answer')
   async answerQuickGameQuestion(@Body() dto: AnswerQuickGameQuestionDto) {
     try {
-      return await this.gamePlayerService.answerQuickGameQuestion(dto.game_id, dto.question_id, dto.answer_id);
+      return await this.gamePlayerService.answerQuickGameQuestion(
+        dto.game_id,
+        dto.question_id,
+        dto.answer_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -522,7 +592,12 @@ export class GamePlayerController {
   @Post('quick-game/steal-question')
   async stealQuickGameQuestion(@Body() dto: StealQuickGameQuestionDto) {
     try {
-      return await this.gamePlayerService.stealQuickGameQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.user_id);
+      return await this.gamePlayerService.stealQuickGameQuestion(
+        dto.game_id,
+        dto.question_id,
+        dto.answer_id,
+        dto.user_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -531,13 +606,21 @@ export class GamePlayerController {
     }
   }
 
-
+  // add player and start game
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Add multiple players to Quick Game at once' })
   @Post('quick-game/add-multiple-players')
-  async addMultipleQuickGamePlayers(@Body() dto: AddMultipleQuickGamePlayersDto) {
+  async addMultipleQuickGamePlayers(
+    @Body() dto: AddMultipleQuickGamePlayersDto,
+    @Req() req: any,
+  ) {
     try {
-      return await this.gamePlayerService.addMultipleQuickGamePlayers(dto.game_id, dto.player_names);
+      const userId = req.user.userId;
+      return await this.gamePlayerService.addMultipleQuickGamePlayers(
+        dto.game_id,
+        dto.player_names,
+        userId,
+      );
     } catch (error) {
       return {
         success: false,
@@ -546,19 +629,24 @@ export class GamePlayerController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Add multiple players and start Quick Game immediately' })
-  @Post('quick-game/add-players-and-start')
-  async addPlayersAndStartQuickGame(@Body() dto: AddPlayersAndStartGameDto) {
-    try {
-      return await this.gamePlayerService.addPlayersAndStartQuickGame(dto.game_id, dto.player_names);
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
+  // @UseGuards(JwtAuthGuard)
+  // @ApiOperation({
+  //   summary: 'Add multiple players and start Quick Game immediately',
+  // })
+  // @Post('quick-game/add-players-and-start')
+  // async addPlayersAndStartQuickGame(@Body() dto: AddPlayersAndStartGameDto) {
+  //   try {
+  //     return await this.gamePlayerService.addPlayersAndStartQuickGame(
+  //       dto.game_id,
+  //       dto.player_names,
+  //     );
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: error.message,
+  //     };
+  //   }
+  // }
 
   // ===== COMPETITIVE QUICK GAME ENDPOINTS =====
 
@@ -577,11 +665,17 @@ export class GamePlayerController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Select category and difficulty for competitive game' })
+  @ApiOperation({
+    summary: 'Select category and difficulty for competitive game',
+  })
   @Post('competitive-quick-game/select-category')
   async selectCompetitiveCategory(@Body() dto: SelectCompetitiveCategoryDto) {
     try {
-      return await this.gamePlayerService.selectCompetitiveCategory(dto.game_id, dto.category_id, dto.difficulty_id);
+      return await this.gamePlayerService.selectCompetitiveCategory(
+        dto.game_id,
+        dto.category_id,
+        dto.difficulty_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -590,6 +684,7 @@ export class GamePlayerController {
     }
   }
 
+  // steal question/ player specific question || I think no neded
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get next question for competitive game' })
   @Get('competitive-quick-game/question/:gameId')
@@ -604,12 +699,42 @@ export class GamePlayerController {
     }
   }
 
+  // play game with selected player|| now not select player
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Answer question in competitive game' })
   @Post('competitive-quick-game/answer')
   async answerCompetitiveQuestion(@Body() dto: AnswerCompetitiveQuestionDto) {
     try {
-      return await this.gamePlayerService.answerCompetitiveQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id);
+      return await this.gamePlayerService.answerCompetitiveQuestion(
+        dto.game_id,
+        dto.question_id,
+        dto.player_id,
+        dto.answer_id,
+        dto.answer_text,
+      );
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // for time out or quit game
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('timeout-skiped')
+  @ApiOperation({ summary: 'Handle a question timeout' })
+  async handleQuestionTimeout(
+    @Body() timeoutDto: QuestionTimeoutDto,
+    @Req() req: any,
+  ) {
+    try {
+      return await this.gamePlayerService.handleQuestionTimeout(
+        timeoutDto.game_id,
+        timeoutDto.question_id,
+        timeoutDto.player_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -657,8 +782,8 @@ export class GamePlayerController {
         data: {
           user: req.user,
           userId: req.user?.userId,
-          email: req.user?.email
-        }
+          email: req.user?.email,
+        },
       };
     } catch (error) {
       return {
@@ -673,10 +798,16 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Host starts competitive game' })
   @Post('host-game/start/:gameId')
-  async hostStartCompetitiveGame(@Param('gameId') gameId: string, @Req() req: any) {
+  async hostStartCompetitiveGame(
+    @Param('gameId') gameId: string,
+    @Req() req: any,
+  ) {
     try {
       const hostUserId = req.user.userId;
-      return await this.gamePlayerService.hostStartCompetitiveGame(gameId, hostUserId);
+      return await this.gamePlayerService.hostStartCompetitiveGame(
+        gameId,
+        hostUserId,
+      );
     } catch (error) {
       return {
         success: false,
@@ -688,10 +819,18 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Host selects category and difficulty' })
   @Post('host-game/select-category')
-  async hostSelectCategory(@Body() dto: HostSelectCategoryDto, @Req() req: any) {
+  async hostSelectCategory(
+    @Body() dto: HostSelectCategoryDto,
+    @Req() req: any,
+  ) {
     try {
       const hostUserId = req.user.userId;
-      return await this.gamePlayerService.hostSelectCategory(dto.game_id, dto.category_id, dto.difficulty_id, hostUserId);
+      return await this.gamePlayerService.hostSelectCategory(
+        dto.game_id,
+        dto.category_id,
+        dto.difficulty_id,
+        hostUserId,
+      );
     } catch (error) {
       return {
         success: false,
@@ -718,10 +857,19 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Host submits answer on behalf of a player' })
   @Post('host-game/answer')
-  async hostAnswerQuestion(@Body() dto: HostAnswerQuestionDto, @Req() req: any) {
+  async hostAnswerQuestion(
+    @Body() dto: HostAnswerQuestionDto,
+    @Req() req: any,
+  ) {
     try {
       const hostUserId = req.user.userId;
-      return await this.gamePlayerService.hostAnswerQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id, hostUserId);
+      return await this.gamePlayerService.hostAnswerQuestion(
+        dto.game_id,
+        dto.question_id,
+        dto.answer_id,
+        dto.player_id,
+        hostUserId,
+      );
     } catch (error) {
       return {
         success: false,
@@ -736,7 +884,11 @@ export class GamePlayerController {
   async hostSkipQuestion(@Body() dto: HostSkipQuestionDto, @Req() req: any) {
     try {
       const hostUserId = req.user.userId;
-      return await this.gamePlayerService.hostSkipQuestion(dto.game_id, dto.question_id, hostUserId);
+      return await this.gamePlayerService.hostSkipQuestion(
+        dto.game_id,
+        dto.question_id,
+        hostUserId,
+      );
     } catch (error) {
       return {
         success: false,
@@ -762,26 +914,37 @@ export class GamePlayerController {
 
   // ===== QUICK GAME FLOW ENDPOINTS =====
 
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Add players only (don\'t start game)' })
-  @Post('quick-game/add-players')
-  async addPlayersOnly(@Body() dto: AddPlayersOnlyDto) {
-    try {
-      return await this.gamePlayerService.addPlayersOnly(dto.game_id, dto.player_names);
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
+  // eta pore dekhte hobe, abadoto lagche na dekhe coment kore rakhchi
+
+  // @UseGuards(JwtAuthGuard)
+  // @ApiOperation({ summary: "Add players only (don't start game)" })
+  // @Post('quick-game/add-players')
+  // async addPlayersOnly(@Body() dto: AddPlayersOnlyDto) {
+  //   try {
+  //     return await this.gamePlayerService.addPlayersOnly(
+  //       dto.game_id,
+  //       dto.player_names,
+  //     );
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: error.message,
+  //     };
+  //   }
+  // }
 
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Select category/difficulty and start game in one step' })
+  @ApiOperation({
+    summary: 'Select category/difficulty and start game in one step',
+  })
   @Post('quick-game/select-category-and-start')
   async selectCategoryAndStart(@Body() dto: SelectCategoryAndStartDto) {
     try {
-      return await this.gamePlayerService.selectCategoryAndStart(dto.game_id, dto.category_id, dto.difficulty_id);
+      return await this.gamePlayerService.selectSingleQuestionForGame(
+        dto.game_id,
+        dto.category_id,
+        dto.difficulty_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -789,7 +952,6 @@ export class GamePlayerController {
       };
     }
   }
-
 
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get question for current player' })
@@ -810,7 +972,12 @@ export class GamePlayerController {
   @Post('quick-game/answer')
   async playerAnswerQuestion(@Body() dto: PlayerAnswerQuestionDto) {
     try {
-      return await this.gamePlayerService.playerAnswerQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id);
+      return await this.gamePlayerService.playerAnswerQuestion(
+        dto.game_id,
+        dto.question_id,
+        dto.answer_id,
+        dto.player_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -820,11 +987,18 @@ export class GamePlayerController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Steal question - forwards same question to next player' })
+  @ApiOperation({
+    summary: 'Steal question - forwards same question to next player',
+  })
   @Post('quick-game/steal-question')
   async stealQuestion(@Body() dto: StealQuestionDto) {
     try {
-      return await this.gamePlayerService.stealQuestion(dto.game_id, dto.question_id, dto.answer_id, dto.player_id);
+      return await this.gamePlayerService.stealQuestion(
+        dto.game_id,
+        dto.question_id,
+        dto.answer_id,
+        dto.player_id,
+      );
     } catch (error) {
       return {
         success: false,
@@ -874,5 +1048,4 @@ export class GamePlayerController {
       };
     }
   }
-
 }
