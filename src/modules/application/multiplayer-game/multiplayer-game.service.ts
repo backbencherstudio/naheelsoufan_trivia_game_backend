@@ -30,7 +30,7 @@ export class MultiplayerGameService {
         where: {
           host_id: hostId,
           mode: {
-            in: ['QUICK_GAME', 'GRID_STYLE'], // আপনার সব গেম মোড এখানে যোগ করুন
+            in: ['QUICK_GAME', 'GRID_STYLE'],
           },
         },
       });

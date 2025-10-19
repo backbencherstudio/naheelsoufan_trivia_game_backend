@@ -235,7 +235,7 @@ export class AuthService {
         throw new Error('User not found.');
       }
 
-      if (!user.email_verified_at) {
+      if (user.type !== 'admin' && !user.email_verified_at) {
         return {
           success: false,
           message: 'Your email is not verified. Please check your inbox.',

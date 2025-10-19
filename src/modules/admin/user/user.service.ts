@@ -9,7 +9,7 @@ import { DateHelper } from '../../../common/helper/date.helper';
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
     try {
@@ -46,7 +46,7 @@ export class UserService {
       type?: string;
       approved?: string;
       role?: string; // host or player
-    }
+    },
   ) {
     try {
       const skip = (page - 1) * limit;
@@ -67,12 +67,12 @@ export class UserService {
         if (filters.role.toLowerCase() === 'host') {
           // Users who have created rooms (hosts)
           whereClause['rooms'] = {
-            some: {} // Has at least one room
+            some: {}, // Has at least one room
           };
         } else if (filters.role.toLowerCase() === 'player') {
           // Users who have joined games as players
           whereClause['game_players'] = {
-            some: {} // Has at least one game player record
+            some: {}, // Has at least one game player record
           };
         }
       }
@@ -86,16 +86,15 @@ export class UserService {
 
         if (Object.keys(whereClause).length > 0) {
           // Combine existing filters with search using AND
-          whereClause['AND'] = [
-            { ...whereClause },
-            { OR: searchConditions }
-          ];
+          whereClause['AND'] = [{ ...whereClause }, { OR: searchConditions }];
 
           // Clear the direct conditions since they're now in AND
           if (filters.type) delete whereClause['type'];
           if (filters.approved) delete whereClause['approved_at'];
-          if (filters.role && filters.role.toLowerCase() === 'host') delete whereClause['rooms'];
-          if (filters.role && filters.role.toLowerCase() === 'player') delete whereClause['game_players'];
+          if (filters.role && filters.role.toLowerCase() === 'host')
+            delete whereClause['rooms'];
+          if (filters.role && filters.role.toLowerCase() === 'player')
+            delete whereClause['game_players'];
         } else {
           whereClause['OR'] = searchConditions;
         }
@@ -127,8 +126,8 @@ export class UserService {
             select: {
               rooms: true, // Number of rooms created (host activity)
               game_players: true, // Number of games played (player activity)
-            }
-          }
+            },
+          },
         },
       });
 
@@ -139,7 +138,9 @@ export class UserService {
 
       return {
         success: true,
-        message: users.length ? 'Users retrieved successfully' : 'No users found',
+        message: users.length
+          ? 'Users retrieved successfully'
+          : 'No users found',
         data: users,
         pagination: {
           total: total,
@@ -157,6 +158,25 @@ export class UserService {
       };
     }
   }
+
+  // async findAllHosts() {
+  //   try {
+  //     const users = await this.prisma.user.findMany({
+  //       where: { type: 'host' },
+  //       select: {
+  //         id: true,
+  //         name: true,
+  //         email: true,
+  //       },
+  //     });
+  //     return { success: true, data: users };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: error.message,
+  //     };
+  //   }
+  // }
 
   async findOne(id: string) {
     try {

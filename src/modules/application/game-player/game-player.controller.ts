@@ -56,9 +56,14 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { QuestionTimeoutDto } from './dto/question-timeout.dto';
+import { RolesGuard } from 'src/common/guard/role/roles.guard';
+import { Role } from 'src/common/guard/role/role.enum';
+import { Roles } from 'src/common/guard/role/roles.decorator';
 
 @ApiTags('Game Player')
 @Controller('game-players')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.USER, Role.ADMIN, Role.HOST)
 @ApiBearerAuth()
 export class GamePlayerController {
   constructor(private readonly gamePlayerService: GamePlayerService) {}
