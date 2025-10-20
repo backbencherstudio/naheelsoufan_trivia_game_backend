@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
@@ -30,14 +31,27 @@ export class SubscriptionService {
         // Count total records for pagination
         const total = await this.prisma.subscription.count({ where: whereClause });
 
+        // Build orderBy supporting related fields (user.name, user.email) and scalar fields
+        const direction: Prisma.SortOrder = (order || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+        const relationOrder: Prisma.SubscriptionOrderByWithRelationInput =
+            sort === 'name' ? { user: { name: direction } } :
+                sort === 'email' ? { user: { email: direction } } : {};
+
+        const scalarSortField = ['created_at', 'updated_at', 'games_played_count', 'paid_amount', 'status', 'payment_status'].includes(sort)
+            ? sort
+            : 'created_at';
+
+        const orderByClause: Prisma.SubscriptionOrderByWithRelationInput =
+            Object.keys(relationOrder).length > 0
+                ? relationOrder
+                : { [scalarSortField]: direction } as Prisma.SubscriptionOrderByWithRelationInput;
+
         // Query the subscriptions with pagination, sorting, and filtering
         const subscriptions = await this.prisma.subscription.findMany({
             where: whereClause,
             skip: skip,
             take: limit,
-            orderBy: {
-                [sort]: order,
-            },
+            orderBy: orderByClause,
             include: {
                 user: {
                     select: {

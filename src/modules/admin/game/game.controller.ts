@@ -42,7 +42,7 @@ export class GameController {
 
   @ApiOperation({ summary: 'Read all games' })
   @Get()
-  async findAll(@Query() query: { q?: string }) {
+  async findAll(@Query() query: { q?: string; page?: string; limit?: string }) {
     try {
       const searchQuery = query.q; // Optional search query
       const games = await this.gameService.findAll(searchQuery); // Fetch all games
