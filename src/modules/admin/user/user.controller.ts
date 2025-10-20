@@ -24,7 +24,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 @Roles(Role.ADMIN)
 @Controller('admin/user')
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService) {}
 
   @ApiResponse({ description: 'Create a user' })
   @Post()
@@ -43,7 +43,8 @@ export class UserController {
   @ApiResponse({ description: 'Get all users' })
   @Get()
   async findAll(
-    @Query() query: {
+    @Query()
+    query: {
       q?: string;
       type?: string;
       approved?: string;
@@ -70,7 +71,7 @@ export class UserController {
         limit,
         sort,
         order,
-        { type, approved, role }
+        { type, approved, role },
       );
       return users;
     } catch (error) {

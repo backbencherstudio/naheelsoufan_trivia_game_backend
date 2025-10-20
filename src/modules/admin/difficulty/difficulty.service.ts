@@ -5,7 +5,7 @@ import { UpdateDifficultyDto } from './dto/update-difficulty.dto';
 
 @Injectable()
 export class DifficultyService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   // Create a new difficulty level
   async create(createDifficultyDto: CreateDifficultyDto) {
@@ -40,7 +40,14 @@ export class DifficultyService {
   }
 
   // Get all difficulty levels with pagination and search
-  async findAll(searchQuery: string | null, page: number, limit: number, sort: string, order: string, languageId?: string) {
+  async findAll(
+    searchQuery: string | null,
+    page: number,
+    limit: number,
+    sort: string,
+    order: string,
+    languageId?: string,
+  ) {
     try {
       const skip = (page - 1) * limit;
 
@@ -64,7 +71,7 @@ export class DifficultyService {
         skip: skip,
         take: limit,
         orderBy: {
-          [sort]: order,  // Dynamically sort by the field and order provided
+          [sort]: order, // Dynamically sort by the field and order provided
         },
         select: {
           id: true,
@@ -88,7 +95,9 @@ export class DifficultyService {
 
       return {
         success: true,
-        message: difficulties.length ? 'Difficulties retrieved successfully' : 'No difficulties found',
+        message: difficulties.length
+          ? 'Difficulties retrieved successfully'
+          : 'No difficulties found',
         data: difficulties,
         pagination: {
           total: total,
@@ -98,6 +107,40 @@ export class DifficultyService {
           hasNextPage: hasNextPage,
           hasPreviousPage: hasPreviousPage,
         },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error fetching difficulties: ${error.message}`,
+      };
+    }
+  }
+
+  // Get all difficulties without pagination
+  async findAllDifficulties() {
+    try {
+      const difficulties = await this.prisma.difficulty.findMany({
+        select: {
+          id: true,
+          name: true,
+          points: true,
+          created_at: true,
+          updated_at: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        message: difficulties.length
+          ? 'Difficulties retrieved successfully'
+          : 'No difficulties found',
+        data: difficulties,
       };
     } catch (error) {
       return {
@@ -129,7 +172,9 @@ export class DifficultyService {
 
       return {
         success: true,
-        message: difficulty ? 'Difficulty retrieved successfully' : 'Difficulty not found',
+        message: difficulty
+          ? 'Difficulty retrieved successfully'
+          : 'Difficulty not found',
         data: difficulty,
       };
     } catch (error) {

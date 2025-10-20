@@ -20,25 +20,22 @@ import { Roles } from '../../../common/guard/role/roles.decorator';
 import { Role } from '../../../common/guard/role/role.enum';
 
 @ApiTags('Game')
-@Controller('admin/games')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
+@Controller('admin/games')
 export class GameController {
-  constructor(private readonly gameService: GameService) { }
+  constructor(private readonly gameService: GameService) {}
 
   @ApiOperation({ summary: 'Create a new game' })
   @Post()
-  async create(
-    @Body() createGameDto: CreateGameDto,
-    @Req() req: any,
-  ) {
+  async create(@Body() createGameDto: CreateGameDto, @Req() req: any) {
     try {
       const game = await this.gameService.create(createGameDto);
-      return game;  // Return the created game data
+      return game; // Return the created game data
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if creation fails
+        message: error.message, // Return error message if creation fails
       };
     }
   }
@@ -47,15 +44,15 @@ export class GameController {
   @Get()
   async findAll(@Query() query: { q?: string; page?: string; limit?: string }) {
     try {
-      const searchQuery = query.q;  // Optional search query
-      const page = parseInt(query.page) || 1;  // Default page is 1
-      const limit = parseInt(query.limit) || 10;  // Default limit is 10
-      const games = await this.gameService.findAll(searchQuery, page, limit);  // Fetch games with pagination
+      const searchQuery = query.q; // Optional search query
+      const page = parseInt(query.page) || 1; // Default page is 1
+      const limit = parseInt(query.limit) || 10; // Default limit is 10
+      const games = await this.gameService.findAll(searchQuery, page, limit);
       return games;
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if fetching fails
+        message: error.message, // Return error message if fetching fails
       };
     }
   }
@@ -64,30 +61,26 @@ export class GameController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {
-      const game = await this.gameService.findOne(id);  // Fetch a game by ID
+      const game = await this.gameService.findOne(id); // Fetch a game by ID
       return game;
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if fetching fails
+        message: error.message, // Return error message if fetching fails
       };
     }
   }
 
-
   @ApiOperation({ summary: 'Update a game' })
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateGameDto: UpdateGameDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateGameDto: UpdateGameDto) {
     try {
       const game = await this.gameService.update(id, updateGameDto);
-      return game;  // Return updated game data
+      return game; // Return updated game data
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if updating fails
+        message: error.message, // Return error message if updating fails
       };
     }
   }
@@ -96,12 +89,12 @@ export class GameController {
   @Delete(':id')
   async remove(@Param('id') id: string) {
     try {
-      const game = await this.gameService.remove(id);  // Delete game by ID
+      const game = await this.gameService.remove(id); // Delete game by ID
       return game;
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if deletion fails
+        message: error.message, // Return error message if deletion fails
       };
     }
   }
@@ -110,12 +103,12 @@ export class GameController {
   @Get(':id/stats')
   async getStats(@Param('id') id: string) {
     try {
-      const stats = await this.gameService.getGameStats(id);  // Get game statistics
+      const stats = await this.gameService.getGameStats(id); // Get game statistics
       return stats;
     } catch (error) {
       return {
         success: false,
-        message: error.message,  // Return error message if fetching fails
+        message: error.message, // Return error message if fetching fails
       };
     }
   }
