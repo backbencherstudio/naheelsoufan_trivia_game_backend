@@ -18,6 +18,7 @@ import {
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 import appConfig from 'src/config/app.config';
 import { MessageGateway } from 'src/modules/chat/message/message.gateway';
+import { checkTextAnswer } from 'src/common/helper/stringSimilarity.helper';
 
 @Injectable()
 export class GamePlayerService {
@@ -3000,9 +3001,7 @@ export class GamePlayerService {
         }
 
         if (correctAnswer) {
-          isCorrect =
-            answerText.trim().toLowerCase() ===
-            correctAnswer.text.trim().toLowerCase();
+          isCorrect = checkTextAnswer(answerText, correctAnswer.text);
         }
         selectedAnswerIdForDB = isCorrect ? correctAnswer.id : null;
       } else {
@@ -3024,7 +3023,6 @@ export class GamePlayerService {
         isCorrect = selectedAnswer.is_correct;
         selectedAnswerIdForDB = selectedAnswer.id;
       }
-
       const pointsEarned = isCorrect
         ? isStealMode
           ? Math.round(question.points / 2)

@@ -169,7 +169,7 @@ export class CategoryController {
     } catch (error) {
       return {
         success: false,
-        message: error.message, // Return error message if deletion fails
+        message: error.message,
       };
     }
   }
