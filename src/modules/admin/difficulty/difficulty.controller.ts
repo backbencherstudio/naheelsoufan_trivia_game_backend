@@ -91,8 +91,9 @@ export class DifficultyController {
     summary: 'Read all difficulty levels',
   })
   @Get('/all')
-  getAllDifficulties() {
-    return this.difficultyService.findAllDifficulties();
+  getAllDifficulties(@Query() query: { language_id?: string }) {
+    const languageId = query.language_id;
+    return this.difficultyService.findAllDifficulties(languageId);
   }
 
   @UseGuards(JwtAuthGuard)

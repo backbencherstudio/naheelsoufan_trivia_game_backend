@@ -116,10 +116,16 @@ export class DifficultyService {
     }
   }
 
-  // Get all difficulties without pagination
-  async findAllDifficulties() {
+  // Get all difficulties without pagination, filtering by language
+  async findAllDifficulties(languageId?: string) {
     try {
+      const whereClause = {};
+      if (languageId) {
+        whereClause['language_id'] = languageId;
+      }
+
       const difficulties = await this.prisma.difficulty.findMany({
+        where: whereClause,
         select: {
           id: true,
           name: true,
