@@ -3493,7 +3493,7 @@ export class GamePlayerService {
         const lastPlayerIndex = game.game_players.findIndex(
           (p) => p.id === game.current_player_id,
         );
-        const nextPlayerIndex = (lastPlayerIndex + 1) % totalPlayers;
+        const nextPlayerIndex = (lastPlayerIndex + 0) % totalPlayers;
         currentPlayer = game.game_players[nextPlayerIndex];
       }
 
