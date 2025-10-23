@@ -22,7 +22,7 @@ export class DashboardService {
                 this.prisma.gamePlayer.count(),
                 this.prisma.question.count(),
                 this.prisma.category.count(),
-                this.prisma.gamePlayer.count({  }),
+                this.prisma.user.count({ where: { type: 'host' } }),
                 this.prisma.game.count(),
                 this.prisma.subscription.count(),
                 this.prisma.gamePlayer.count({

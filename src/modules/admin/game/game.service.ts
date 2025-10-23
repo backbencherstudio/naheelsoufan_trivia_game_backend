@@ -95,12 +95,7 @@ export class GameService {
           game_players: {
             select: {
               id: true,
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
+              player_name: true,
             },
           },
           _count: {

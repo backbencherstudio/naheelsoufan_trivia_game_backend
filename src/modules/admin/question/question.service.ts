@@ -451,7 +451,7 @@ export class QuestionService {
     }
   }
 
-  // Import questions from uploaded file
+  // OLD IMPORT METHOD - COMMENTED OUT
   // async importQuestions(file: Express.Multer.File) {
   //   try {
   //     // Validate file type
@@ -483,47 +483,129 @@ export class QuestionService {
 
   //       try {
   //         // Validate required fields
-  //         if (!questionData.text || !questionData.category.id || !questionData.language.id ||
-  //           !questionData.difficulty.id || !questionData.question_type.id || !questionData.answers) {
+  //         if (!questionData.text || !questionData.language || !questionData.category ||
+  //           !questionData.difficulty || !questionData.question_type) {
   //           throw new Error(`Missing required fields in question ${i + 1}`);
   //         }
 
-  //         if (!Array.isArray(questionData.answers) || questionData.answers.length === 0) {
-  //           throw new Error(`Question ${i + 1} must have at least one answer`);
+  //         // Handle language - find existing or create new
+  //         let languageId;
+  //         const existingLanguage = await this.prisma.language.findFirst({
+  //           where: { name: questionData.language }
+  //         });
+
+  //         if (existingLanguage) {
+  //           languageId = existingLanguage.id;
+  //         } else {
+  //           // Create new language with default code
+  //           const newLanguage = await this.prisma.language.create({
+  //             data: {
+  //               name: questionData.language,
+  //               code: questionData.language.toLowerCase().substring(0, 2),
+  //             },
+  //           });
+  //           languageId = newLanguage.id;
   //         }
 
-  //         // Check if at least one answer is correct
-  //         const hasCorrectAnswer = questionData.answers.some(answer => answer.is_correct === true);
-  //         if (!hasCorrectAnswer) {
-  //           throw new Error(`Question ${i + 1} must have at least one correct answer`);
+  //         // Handle category - find existing or create new
+  //         let categoryId;
+  //         const existingCategory = await this.prisma.category.findFirst({
+  //           where: {
+  //             name: questionData.category,
+  //             language_id: languageId
+  //           }
+  //         });
+
+  //         if (existingCategory) {
+  //           categoryId = existingCategory.id;
+  //         } else {
+  //           // Create new category
+  //           const newCategory = await this.prisma.category.create({
+  //             data: {
+  //               name: questionData.category,
+  //               language_id: languageId,
+  //             },
+  //           });
+  //           categoryId = newCategory.id;
   //         }
+
+  //         // Handle difficulty - find existing or create new
+  //         let difficultyId;
+  //         const existingDifficulty = await this.prisma.difficulty.findFirst({
+  //           where: {
+  //             name: questionData.difficulty,
+  //             language_id: languageId
+  //           }
+  //         });
+
+  //         if (existingDifficulty) {
+  //           difficultyId = existingDifficulty.id;
+  //         } else {
+  //           // Create new difficulty with default points
+  //           const defaultPoints = this.getDefaultPoints(questionData.difficulty);
+  //           const newDifficulty = await this.prisma.difficulty.create({
+  //             data: {
+  //               name: questionData.difficulty,
+  //               language_id: languageId,
+  //               points: questionData.points || defaultPoints,
+  //             },
+  //           });
+  //           difficultyId = newDifficulty.id;
+  //         }
+
+  //         // Handle question type - find existing or create new
+  //         let questionTypeId;
+  //         const existingQuestionType = await this.prisma.questionType.findFirst({
+  //           where: {
+  //             name: questionData.question_type,
+  //           }
+  //         });
+
+  //         if (existingQuestionType) {
+  //           questionTypeId = existingQuestionType.id;
+  //         } else {
+  //           // Create new question type
+  //           const newQuestionType = await this.prisma.questionType.create({
+  //             data: {
+  //               name: questionData.question_type,
+  //               language_id: languageId,
+  //             },
+  //           });
+  //           questionTypeId = newQuestionType.id;
+  //         }
+
+  //         // Process answers based on question type
+  //         const answers = this.processAnswers(questionData);
 
   //         // Create question
   //         const question = await this.prisma.question.create({
   //           data: {
   //             text: questionData.text,
-  //             category_id: questionData.category.id,
-  //             language_id: questionData.language.id,
-  //             difficulty_id: questionData.difficulty.id,
-  //             question_type_id: questionData.question_type.id,
+  //             category_id: categoryId,
+  //             language_id: languageId,
+  //             difficulty_id: difficultyId,
+  //             question_type_id: questionTypeId,
   //             file_url: questionData.file_url || null,
   //             time: questionData.time || 30,
   //             points: questionData.points || 10,
   //             free_bundle: questionData.free_bundle || false,
-  //             firebase: questionData.firebase || false, // Should be boolean, not string
+  //             firebase: questionData.isFirebase || false,
   //           },
   //         });
 
   //         // Create answers
-  //         const answersData = questionData.answers.map(answer => ({
-  //           text: answer.text,
-  //           is_correct: answer.is_correct || false,
-  //           question_id: question.id,
-  //         }));
+  //         if (answers && answers.length > 0) {
+  //           const answersData = answers.map(answer => ({
+  //             text: answer.text,
+  //             is_correct: answer.is_correct,
+  //             question_id: question.id,
+  //             file_url: answer.file_url || null,
+  //           }));
 
-  //         await this.prisma.answer.createMany({
-  //           data: answersData,
-  //         });
+  //           await this.prisma.answer.createMany({
+  //             data: answersData,
+  //           });
+  //         }
 
   //         successCount++;
   //       } catch (questionError) {
@@ -550,6 +632,7 @@ export class QuestionService {
   //   }
   // }
 
+  // NEW IMPORT METHOD - For the specified data format
   async importQuestions(file: Express.Multer.File) {
     try {
       // Validate file type
@@ -582,8 +665,13 @@ export class QuestionService {
         try {
           // Validate required fields
           if (!questionData.text || !questionData.language || !questionData.category ||
-            !questionData.difficulty || !questionData.question_type) {
+            !questionData.difficulty || !questionData.question_type || !questionData.answers) {
             throw new Error(`Missing required fields in question ${i + 1}`);
+          }
+
+          // Validate answers array
+          if (!Array.isArray(questionData.answers) || questionData.answers.length === 0) {
+            throw new Error(`Invalid or empty answers array in question ${i + 1}`);
           }
 
           // Handle language - find existing or create new
@@ -656,6 +744,7 @@ export class QuestionService {
           const existingQuestionType = await this.prisma.questionType.findFirst({
             where: {
               name: questionData.question_type,
+              language_id: languageId
             }
           });
 
@@ -672,9 +761,6 @@ export class QuestionService {
             questionTypeId = newQuestionType.id;
           }
 
-          // Process answers based on question type
-          const answers = this.processAnswers(questionData);
-
           // Create question
           const question = await this.prisma.question.create({
             data: {
@@ -687,23 +773,21 @@ export class QuestionService {
               time: questionData.time || 30,
               points: questionData.points || 10,
               free_bundle: questionData.free_bundle || false,
-              firebase: questionData.isFirebase || false,
+              firebase: questionData.firebase || false,
             },
           });
 
-          // Create answers
-          if (answers && answers.length > 0) {
-            const answersData = answers.map(answer => ({
-              text: answer.text,
-              is_correct: answer.is_correct,
-              question_id: question.id,
-              file_url: answer.file_url || null,
-            }));
+          // Create answers directly from the answers array
+          const answersData = questionData.answers.map(answer => ({
+            text: answer.text,
+            is_correct: answer.is_correct,
+            question_id: question.id,
+            file_url: answer.file_url || null,
+          }));
 
-            await this.prisma.answer.createMany({
-              data: answersData,
-            });
-          }
+          await this.prisma.answer.createMany({
+            data: answersData,
+          });
 
           successCount++;
         } catch (questionError) {
