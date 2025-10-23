@@ -74,6 +74,14 @@ export class CategoryController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Read all categories by language id' })
+  @Get('topics')
+  async findAllTopics(@Query() query: { language_id?: string }) {
+    const languageId = query.language_id;
+    return await this.categoryService.findAllByLanguageId(languageId);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Import categories from file' })

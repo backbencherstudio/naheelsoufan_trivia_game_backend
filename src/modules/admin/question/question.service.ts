@@ -67,12 +67,7 @@ export class QuestionService {
 
       // question file get
       if (question.file_url) {
-        // Check if image is already a URL (starts with https)
-        if (question.file_url.startsWith('https')) {
-          question['question_file_url'] = question.file_url;
-        } else {
-          question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
-        }
+        question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
       }
       // answers file get
       if (answers && answers.length > 0) {
@@ -167,22 +162,12 @@ export class QuestionService {
       // Add file URLs for questions and answers
       for (const question of questions) {
         if (question.file_url) {
-          // Check if image is already a URL (starts with https)
-          if (question.file_url.startsWith('https')) {
-            question['question_file_url'] = question.file_url;
-          } else {
-            question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
-          }
+          question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
         }
         if (question.answers && question.answers.length > 0) {
           for (const answer of question.answers) {
             if (answer.file_url) {
-              // Check if image is already a URL (starts with https)
-              if (answer.file_url.startsWith('https')) {
-                answer['answer_file_url'] = answer.file_url;
-              } else {
-                answer['answer_file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
-              }
+              answer['answer_file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
             }
           }
         }
@@ -267,24 +252,14 @@ export class QuestionService {
       // Check if the question exists and then process the file URL for the question
       if (question) {
         if (question.file_url) {
-          // Check if image is already a URL (starts with https)
-          if (question.file_url.startsWith('https')) {
-            question['question_file_url'] = question.file_url;
-          } else {
-            question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
-          }
+          question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
         }
 
         // Loop through the answers to append the file URL
         if (question.answers && question.answers.length > 0) {
           for (const answer of question.answers) {
             if (answer.file_url) {
-              // Check if image is already a URL (starts with https)
-              if (answer.file_url.startsWith('https')) {
-                answer['answer_file_url'] = answer.file_url;
-              } else {
-                answer['answer_file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
-              }
+              answer['answer_file_url'] = SojebStorage.url(appConfig().storageUrl.answer + answer.file_url);
             }
           }
         }
@@ -366,12 +341,7 @@ export class QuestionService {
 
       // add question file url
       if (updatedQuestion.file_url) {
-        // Check if image is already a URL (starts with https)
-        if (updatedQuestion.file_url.startsWith('https')) {
-          updatedQuestion['question_file_url'] = updatedQuestion.file_url;
-        } else {
-          updatedQuestion['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + updatedQuestion.file_url);
-        }
+        updatedQuestion['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + updatedQuestion.file_url);
       }
 
 
@@ -658,142 +628,229 @@ export class QuestionService {
       let errorCount = 0;
       const errors = [];
 
-      // Process each question
-      for (let i = 0; i < questionsData.length; i++) {
-        const questionData = questionsData[i];
+      // Process questions in batches to avoid timeout
+      const BATCH_SIZE = 10; // Process 10 questions in parallel
+      const FILE_DOWNLOAD_TIMEOUT = 30000; // 30 seconds timeout per file download
 
-        try {
-          // Validate required fields
-          if (!questionData.text || !questionData.language || !questionData.category ||
-            !questionData.difficulty || !questionData.question_type || !questionData.answers) {
-            throw new Error(`Missing required fields in question ${i + 1}`);
-          }
+      for (let batchStart = 0; batchStart < questionsData.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, questionsData.length);
+        const batch = questionsData.slice(batchStart, batchEnd);
 
-          // Validate answers array
-          if (!Array.isArray(questionData.answers) || questionData.answers.length === 0) {
-            throw new Error(`Invalid or empty answers array in question ${i + 1}`);
-          }
+        // Process batch in parallel
+        const batchPromises = batch.map(async (questionData, index) => {
+          const questionIndex = batchStart + index;
 
-          // Handle language - find existing or create new
-          let languageId;
-          const existingLanguage = await this.prisma.language.findFirst({
-            where: { name: questionData.language }
-          });
-
-          if (existingLanguage) {
-            languageId = existingLanguage.id;
-          } else {
-            // Create new language with default code
-            const newLanguage = await this.prisma.language.create({
-              data: {
-                name: questionData.language,
-                code: questionData.language.toLowerCase().substring(0, 2),
-              },
-            });
-            languageId = newLanguage.id;
-          }
-
-          // Handle category - find existing or create new
-          let categoryId;
-          const existingCategory = await this.prisma.category.findFirst({
-            where: {
-              name: questionData.category,
-              language_id: languageId
+          try {
+            // Validate required fields
+            if (!questionData.text || !questionData.language || !questionData.category ||
+              !questionData.difficulty || !questionData.question_type || !questionData.answers) {
+              throw new Error(`Missing required fields in question ${questionIndex + 1}`);
             }
-          });
 
-          if (existingCategory) {
-            categoryId = existingCategory.id;
-          } else {
-            // Create new category
-            const newCategory = await this.prisma.category.create({
-              data: {
+            // Validate answers array
+            if (!Array.isArray(questionData.answers) || questionData.answers.length === 0) {
+              throw new Error(`Invalid or empty answers array in question ${questionIndex + 1}`);
+            }
+
+            // Handle language - find existing or create new
+            let languageId;
+            const existingLanguage = await this.prisma.language.findFirst({
+              where: { name: questionData.language }
+            });
+
+            if (existingLanguage) {
+              languageId = existingLanguage.id;
+            } else {
+              // Create new language with default code
+              const newLanguage = await this.prisma.language.create({
+                data: {
+                  name: questionData.language,
+                  code: questionData.language.toLowerCase().substring(0, 2),
+                },
+              });
+              languageId = newLanguage.id;
+            }
+
+            // Handle category - find existing or create new
+            let categoryId;
+            const existingCategory = await this.prisma.category.findFirst({
+              where: {
                 name: questionData.category,
-                language_id: languageId,
-              },
+                language_id: languageId
+              }
             });
-            categoryId = newCategory.id;
-          }
 
-          // Handle difficulty - find existing or create new
-          let difficultyId;
-          const existingDifficulty = await this.prisma.difficulty.findFirst({
-            where: {
-              name: questionData.difficulty,
-              language_id: languageId
+            if (existingCategory) {
+              categoryId = existingCategory.id;
+            } else {
+              // Create new category
+              const newCategory = await this.prisma.category.create({
+                data: {
+                  name: questionData.category,
+                  language_id: languageId,
+                },
+              });
+              categoryId = newCategory.id;
             }
-          });
 
-          if (existingDifficulty) {
-            difficultyId = existingDifficulty.id;
-          } else {
-            // Create new difficulty with default points
-            const defaultPoints = this.getDefaultPoints(questionData.difficulty);
-            const newDifficulty = await this.prisma.difficulty.create({
-              data: {
+            // Handle difficulty - find existing or create new
+            let difficultyId;
+            const existingDifficulty = await this.prisma.difficulty.findFirst({
+              where: {
                 name: questionData.difficulty,
-                language_id: languageId,
-                points: questionData.points || defaultPoints,
-              },
+                language_id: languageId
+              }
             });
-            difficultyId = newDifficulty.id;
-          }
 
-          // Handle question type - find existing or create new
-          let questionTypeId;
-          const existingQuestionType = await this.prisma.questionType.findFirst({
-            where: {
-              name: questionData.question_type,
-              language_id: languageId
+            if (existingDifficulty) {
+              difficultyId = existingDifficulty.id;
+            } else {
+              // Create new difficulty with default points
+              const defaultPoints = this.getDefaultPoints(questionData.difficulty);
+              const newDifficulty = await this.prisma.difficulty.create({
+                data: {
+                  name: questionData.difficulty,
+                  language_id: languageId,
+                  points: questionData.points || defaultPoints,
+                },
+              });
+              difficultyId = newDifficulty.id;
             }
-          });
 
-          if (existingQuestionType) {
-            questionTypeId = existingQuestionType.id;
-          } else {
-            // Create new question type
-            const newQuestionType = await this.prisma.questionType.create({
-              data: {
+            // Handle question type - find existing or create new
+            let questionTypeId;
+            const existingQuestionType = await this.prisma.questionType.findFirst({
+              where: {
                 name: questionData.question_type,
+                language_id: languageId
+              }
+            });
+
+            if (existingQuestionType) {
+              questionTypeId = existingQuestionType.id;
+            } else {
+              // Create new question type
+              const newQuestionType = await this.prisma.questionType.create({
+                data: {
+                  name: questionData.question_type,
+                  language_id: languageId,
+                },
+              });
+              questionTypeId = newQuestionType.id;
+            }
+
+            // Handle question file_url - download and store if provided
+            let fileUrl = null;
+            const imageUrlField = questionData.question_file_url || questionData.file_url;
+            if (imageUrlField && typeof imageUrlField === 'string') {
+              try {
+                const imageUrl = imageUrlField.trim();
+                console.log(`[Import] Downloading question file for: "${questionData.text.substring(0, 50)}..."`);
+
+                // Download file with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), FILE_DOWNLOAD_TIMEOUT);
+
+                let response;
+                try {
+                  response = await fetch(imageUrl, {
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (compatible; Node.js)',
+                    },
+                    redirect: 'follow',
+                    signal: controller.signal,
+                  });
+                } catch (fetchError) {
+                  throw new Error(`Network error: ${fetchError.message}`);
+                } finally {
+                  clearTimeout(timeoutId);
+                }
+
+                if (!response.ok) {
+                  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const buffer = await response.arrayBuffer();
+                const fileBuffer = Buffer.from(buffer);
+
+                if (fileBuffer.length === 0) {
+                  throw new Error('Downloaded file is empty');
+                }
+
+                console.log(`[Import] Downloaded: ${fileBuffer.length} bytes`);
+
+                // Generate filename: use timestamp + random
+                const timestamp = Date.now();
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                const fileName = `question-${timestamp}-${randomStr}.jpg`;
+
+                // Store file in SojebStorage
+                await SojebStorage.put(appConfig().storageUrl.question + fileName, fileBuffer);
+                fileUrl = fileName;
+                console.log(`[Import] Stored question file: ${fileName}`);
+              } catch (fileError) {
+                console.warn(`[Import] Failed to download/store question file: ${fileError.message}`);
+                // Continue without file
+              }
+            }
+
+            // Create question
+            const question = await this.prisma.question.create({
+              data: {
+                text: questionData.text,
+                category_id: categoryId,
                 language_id: languageId,
+                difficulty_id: difficultyId,
+                question_type_id: questionTypeId,
+                file_url: fileUrl,
+                time: questionData.time || 30,
+                points: questionData.points || 10,
+                free_bundle: questionData.free_bundle || false,
+                firebase: questionData.firebase || false,
               },
             });
-            questionTypeId = newQuestionType.id;
+
+            // Create answers directly from the answers array
+            const answersData = questionData.answers.map(answer => ({
+              text: answer.text,
+              is_correct: answer.is_correct,
+              question_id: question.id,
+              file_url: answer.file_url || null,
+            }));
+
+            await this.prisma.answer.createMany({
+              data: answersData,
+            });
+
+            return { success: true };
+          } catch (questionError) {
+            return {
+              success: false,
+              error: `Question ${questionIndex + 1}: ${questionError.message}`,
+              text: questionData.text?.substring(0, 50)
+            };
           }
+        });
 
-          // Create question
-          const question = await this.prisma.question.create({
-            data: {
-              text: questionData.text,
-              category_id: categoryId,
-              language_id: languageId,
-              difficulty_id: difficultyId,
-              question_type_id: questionTypeId,
-              file_url: questionData.file_url || null,
-              time: questionData.time || 30,
-              points: questionData.points || 10,
-              free_bundle: questionData.free_bundle || false,
-              firebase: questionData.firebase || false,
-            },
-          });
+        // Wait for all questions in this batch to complete
+        const batchResults = await Promise.allSettled(batchPromises);
 
-          // Create answers directly from the answers array
-          const answersData = questionData.answers.map(answer => ({
-            text: answer.text,
-            is_correct: answer.is_correct,
-            question_id: question.id,
-            file_url: answer.file_url || null,
-          }));
-
-          await this.prisma.answer.createMany({
-            data: answersData,
-          });
-
-          successCount++;
-        } catch (questionError) {
-          errorCount++;
-          errors.push(`Question ${i + 1}: ${questionError.message}`);
+        // Process batch results
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            if (result.status === 'fulfilled' && result.value.error) {
+              errors.push(result.value.error);
+            } else if (result.status === 'rejected') {
+              errors.push(`Batch error: ${result.reason.message}`);
+            }
+          }
         }
+
+        // Log progress
+        console.log(`[Import] Batch complete: ${Math.min(batchEnd, questionsData.length)}/${questionsData.length} questions processed`);
       }
 
       return {
@@ -947,23 +1004,13 @@ export class QuestionService {
 
       for (const question of questions) {
         if (question.file_url) {
-          // Check if image is already a URL (starts with https)
-          if (question.file_url.startsWith('https')) {
-            question['question_file_url'] = question.file_url;
-          } else {
-            question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
-          }
+          question['question_file_url'] = SojebStorage.url(appConfig().storageUrl.question + question.file_url);
         }
       }
 
       for (const question of questions) {
         if (question.category.image) {
-          // Check if image is already a URL (starts with https)
-          if (question.category.image.startsWith('https')) {
-            question.category['image_url'] = question.category.image;
-          } else {
-            question.category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + question.category.image);
-          }
+          question.category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + question.category.image);
         }
       }
 
@@ -977,8 +1024,6 @@ export class QuestionService {
         time: question.time,
         points: question.points,
         free_bundle: question.free_bundle,
-        firebase: question.firebase,
-        file_url: question.file_url,
         question_file_url: question['question_file_url'],
         answers: question.answers.map(answer => ({
           text: answer.text,
