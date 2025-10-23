@@ -42,12 +42,7 @@ export class CategoryService {
       });
 
       if (category && category.image) {
-        // Check if image is already a URL (starts with https)
-        if (category.image.startsWith('https')) {
-          category['image_url'] = category.image;
-        } else {
-          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
-        }
+        category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
       }
 
       return {
@@ -62,6 +57,39 @@ export class CategoryService {
       throw new InternalServerErrorException(
         `Error fetching questions: ${error.message}`
       );
+    }
+  }
+
+  // find all categories by language id
+  async findAllByLanguageId(languageId: string) {
+    try {
+      const whereClause: any = {};
+      if (languageId) {
+        whereClause['language_id'] = languageId;
+      }
+
+      const categories = await this.prisma.category.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          language: { select: { id: true, name: true } },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Categories retrieved successfully',
+        data: categories,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error fetching categories: ${error.message}`,
+      };
     }
   }
 
@@ -111,12 +139,7 @@ export class CategoryService {
       // Add image URLs if the image is available
       for (const category of categories) {
         if (category.image) {
-          // Check if image is already a URL (starts with https)
-          if (category.image.startsWith('https')) {
-            category['image_url'] = category.image;
-          } else {
-            category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
-          }
+          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
         }
       }
 
@@ -180,12 +203,7 @@ export class CategoryService {
       });
 
       if (category && category.image) {
-        // Check if image is already a URL (starts with https)
-        if (category.image.startsWith('https')) {
-          category['image_url'] = category.image;
-        } else {
-          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
-        }
+        category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
       }
 
       return {
@@ -239,12 +257,7 @@ export class CategoryService {
       });
 
       if (updatedCategory && updatedCategory.image) {
-        // Check if image is already a URL (starts with https)
-        if (updatedCategory.image.startsWith('https')) {
-          updatedCategory['image_url'] = updatedCategory.image;
-        } else {
-          updatedCategory['image_url'] = SojebStorage.url(appConfig().storageUrl.category + updatedCategory.image);
-        }
+        updatedCategory['image_url'] = SojebStorage.url(appConfig().storageUrl.category + updatedCategory.image);
       }
 
       return {
@@ -319,57 +332,154 @@ export class CategoryService {
       let errorCount = 0;
       const errors = [];
 
-      // Process each category
-      for (let i = 0; i < categoriesData.length; i++) {
-        const categoryData = categoriesData[i];
+      // Process categories in batches to avoid timeout
+      const BATCH_SIZE = 5; // Process 5 categories in parallel
+      const IMAGE_TIMEOUT = 30000; // 30 seconds timeout per image
 
-        try {
-          // Validate required fields
-          if (!categoryData.name || !categoryData.language) {
-            throw new Error(`Missing required fields in category ${i + 1}`);
-          }
+      for (let batchStart = 0; batchStart < categoriesData.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, categoriesData.length);
+        const batch = categoriesData.slice(batchStart, batchEnd);
 
-          // Handle language - find existing or create new
-          let languageId;
-          if (typeof categoryData.language === 'string') {
-            // Language is provided as string (e.g., "English")
-            const existingLanguage = await this.prisma.language.findFirst({
-              where: { name: categoryData.language }
+        // Process batch in parallel
+        const batchPromises = batch.map(async (categoryData, index) => {
+          const categoryIndex = batchStart + index;
+
+          try {
+            // Validate required fields
+            if (!categoryData.name || !categoryData.language) {
+              throw new Error(`Missing required fields in category ${categoryIndex + 1}`);
+            }
+
+            // Handle language - find existing or create new
+            let languageId;
+            if (typeof categoryData.language === 'string') {
+              // Language is provided as string (e.g., "English")
+              const existingLanguage = await this.prisma.language.findFirst({
+                where: { name: categoryData.language }
+              });
+
+              if (existingLanguage) {
+                languageId = existingLanguage.id;
+              } else {
+                // Create new language with default code
+                const newLanguage = await this.prisma.language.create({
+                  data: {
+                    name: categoryData.language,
+                    code: categoryData.language.toLowerCase().substring(0, 2),
+                  },
+                });
+                languageId = newLanguage.id;
+              }
+            } else if (typeof categoryData.language === 'object' && categoryData.language.id) {
+              // Language is provided as object with id (backward compatibility)
+              languageId = categoryData.language.id;
+            } else {
+              throw new Error(`Invalid language format in category ${categoryIndex + 1}`);
+            }
+
+            // Handle image - if image_url is provided, download and store it
+            let fileName = null;
+            if (categoryData.image_url && typeof categoryData.image_url === 'string') {
+              try {
+                // Firebase URLs should NOT be fully decoded - keep encoded slashes
+                const imageUrl = categoryData.image_url.trim();
+
+                console.log(`[Import] Downloading image for category "${categoryData.name}"`);
+
+                // Download image with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), IMAGE_TIMEOUT);
+
+                let response;
+                try {
+                  response = await fetch(imageUrl, {
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (compatible; Node.js)',
+                      'Accept': 'image/*',
+                    },
+                    redirect: 'follow',
+                    signal: controller.signal,
+                  });
+                } catch (fetchError) {
+                  throw new Error(`Network error: ${fetchError.message}`);
+                } finally {
+                  clearTimeout(timeoutId);
+                }
+
+                if (!response.ok) {
+                  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                // Check content type
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('image')) {
+                  throw new Error(`Invalid content type: ${contentType}`);
+                }
+
+                const buffer = await response.arrayBuffer();
+                const imageBuffer = Buffer.from(buffer);
+
+                if (imageBuffer.length === 0) {
+                  throw new Error('Downloaded image is empty');
+                }
+
+                console.log(`[Import] Downloaded: ${imageBuffer.length} bytes for "${categoryData.name}"`);
+
+                // Generate filename: use category name + timestamp + random
+                const timestamp = Date.now();
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                fileName = `${categoryData.name.toLowerCase().replace(/\s+/g, '-')}-${timestamp}-${randomStr}.jpg`;
+
+                // Store image in SojebStorage
+                await SojebStorage.put(appConfig().storageUrl.category + fileName, imageBuffer);
+                console.log(`[Import] Stored: ${fileName}`);
+              } catch (imageError) {
+                // Log the error but continue with category creation without image
+                console.warn(`[Import] Failed to download/store image for "${categoryData.name}": ${imageError.message}`);
+              }
+            } else if (categoryData.image && typeof categoryData.image === 'string') {
+              // Use existing image if provided (backward compatibility)
+              fileName = categoryData.image;
+            }
+
+            // Create category
+            await this.prisma.category.create({
+              data: {
+                name: categoryData.name,
+                language_id: languageId,
+                image: fileName,
+              },
             });
 
-            if (existingLanguage) {
-              languageId = existingLanguage.id;
-            } else {
-              // Create new language with default code
-              const newLanguage = await this.prisma.language.create({
-                data: {
-                  name: categoryData.language,
-                  code: categoryData.language.toLowerCase().substring(0, 2), // Default code from first 2 chars
-                },
-              });
-              languageId = newLanguage.id;
-            }
-          } else if (typeof categoryData.language === 'object' && categoryData.language.id) {
-            // Language is provided as object with id (backward compatibility)
-            languageId = categoryData.language.id;
-          } else {
-            throw new Error(`Invalid language format in category ${i + 1}`);
+            return { success: true };
+          } catch (categoryError) {
+            return {
+              success: false,
+              error: `Category ${categoryIndex + 1}: ${categoryError.message}`,
+              name: categoryData.name
+            };
           }
+        });
 
-          // Create category
-          await this.prisma.category.create({
-            data: {
-              name: categoryData.name,
-              language_id: languageId,
-              image: categoryData.image || null,
-            },
-          });
+        // Wait for all categories in this batch to complete
+        const batchResults = await Promise.allSettled(batchPromises);
 
-          successCount++;
-        } catch (categoryError) {
-          errorCount++;
-          errors.push(`Category ${i + 1}: ${categoryError.message}`);
+        // Process batch results
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            if (result.status === 'fulfilled' && result.value.error) {
+              errors.push(result.value.error);
+            } else if (result.status === 'rejected') {
+              errors.push(`Batch error: ${result.reason.message}`);
+            }
+          }
         }
+
+        // Log progress
+        console.log(`[Import] Batch complete: ${batchStart + BATCH_SIZE}/${categoriesData.length} categories processed`);
       }
 
       return {
@@ -416,19 +526,13 @@ export class CategoryService {
       // Add image URLs if available
       for (const category of categories) {
         if (category.image) {
-          // Check if image is already a URL (starts with https)
-          if (category.image.startsWith('https')) {
-            category['image_url'] = category.image;
-          } else {
-            category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
-          }
+          category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
         }
       }
 
       // Format data for export
       const exportData = categories.map(category => ({
         name: category.name,
-        image: category.image,
         image_url: category['image_url'],
         language: category.language.name
       }));
