@@ -1096,6 +1096,25 @@ export class GamePlayerService {
         where: { game_id: gameId },
         include: {
           user: { select: { id: true, name: true, email: true, avatar: true } },
+          player_answers: {
+            select: {
+              question_id: true,
+              answer_id: true,
+              isCorrect: true,
+              question: {
+                select: {
+                  text: true,
+                  answers: {
+                    select: {
+                      id: true,
+                      text: true,
+                      is_correct: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: [{ final_rank: 'asc' }],
       });
@@ -2938,12 +2957,34 @@ export class GamePlayerService {
         return { success: false, message: 'Game not found', statusCode: 404 };
       }
 
+      const latestGameQuestion = await this.prisma.gameQuestion.findFirst({
+        where: {
+          game_id: gameId,
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      if (
+        !latestGameQuestion ||
+        latestGameQuestion.question_id !== questionId
+      ) {
+        return {
+          success: false,
+          message:
+            'The submitted answer is for an incorrect or outdated question.',
+          statusCode: 400,
+        };
+      }
+
+      console.log('Latest Game Question:', latestGameQuestion.question_id);
+
       const isMultiPhoneGame = game.rooms && game.rooms.length > 0;
       const roomId = isMultiPhoneGame ? game.rooms[0].id : null;
       const isStealMode = game.current_player_id === null;
 
       if (isStealMode) {
-        // for same player attempt to steal question
         const answerers = await this.prisma.playerAnswer.findMany({
           where: { question_id: questionId, game_player: { game_id: gameId } },
           orderBy: { created_at: 'asc' },
@@ -3023,13 +3064,18 @@ export class GamePlayerService {
         isCorrect = selectedAnswer.is_correct;
         selectedAnswerIdForDB = selectedAnswer.id;
       }
+
       const pointsEarned = isCorrect
         ? isStealMode
           ? Math.round(question.points / 2)
           : question.points
         : 0;
 
-      await this.prisma.$transaction([
+      // Determine if we should increment current_question
+      const shouldIncrementQuestion = isCorrect || (isStealMode && !isCorrect);
+
+      // Perform transaction with conditional current_question increment
+      const transactionOperations: any[] = [
         this.prisma.playerAnswer.create({
           data: {
             game_player_id: playerId,
@@ -3047,17 +3093,73 @@ export class GamePlayerService {
               : { wrong_answers: { increment: 1 } }),
           },
         }),
-      ]);
+      ];
+
+      if (shouldIncrementQuestion) {
+        transactionOperations.push(
+          this.prisma.game.update({
+            where: { id: gameId },
+            data: {
+              current_question: { increment: 1 },
+            },
+          }),
+        );
+      }
+
+      await this.prisma.$transaction(transactionOperations);
+
+      // Fetch updated game data to get the latest current_question
+      const updatedGame = await this.prisma.game.findUnique({
+        where: { id: gameId },
+        include: {
+          game_players: { orderBy: { player_order: 'asc' } },
+        },
+      });
 
       const updatedPlayer = await this.prisma.gamePlayer.findUnique({
         where: { id: playerId },
       });
       const allPlayersHistory = await this.getAllPlayersHistory(
-        game.game_players,
+        updatedGame.game_players,
       );
 
+      // Check if this is the final question AFTER incrementing
+      const isFinalQuestion =
+        updatedGame.total_questions > 0 &&
+        updatedGame.current_question > updatedGame.total_questions;
+
+      // Game Over logic - if this is the final question, end the game
+      if (isFinalQuestion) {
+        await this.prisma.game.update({
+          where: { id: gameId },
+          data: { status: 'COMPLETED', game_phase: 'GAME_OVER' },
+        });
+
+        const gameOverResponse = {
+          success: true,
+          message:
+            'The final question has been answered. The game is now complete!',
+          data: {
+            is_correct: isCorrect,
+            player_score: updatedPlayer.score,
+            next_action: 'GAME_OVER',
+            all_players_history: allPlayersHistory,
+            is_game_over: true,
+            is_steal: isStealMode,
+            points_earned: pointsEarned,
+          },
+        };
+
+        if (isMultiPhoneGame) {
+          this.gatway.emitAnswerResult(roomId, gameOverResponse.data);
+        }
+        return gameOverResponse;
+      }
+
+      // Rest of your existing logic for non-game-over scenarios
       let isRoundOver = false;
-      const lastPlayerInOrder = game.game_players[game.game_players.length - 1];
+      const lastPlayerInOrder =
+        updatedGame.game_players[updatedGame.game_players.length - 1];
 
       if (isCorrect) {
         if (player.player_order === lastPlayerInOrder.player_order) {
@@ -3075,7 +3177,7 @@ export class GamePlayerService {
         });
 
         if (firstAnswerer) {
-          const originalPlayer = game.game_players.find(
+          const originalPlayer = updatedGame.game_players.find(
             (p) => p.id === firstAnswerer.game_player_id,
           );
           if (
@@ -3085,35 +3187,6 @@ export class GamePlayerService {
             isRoundOver = true;
           }
         }
-      }
-
-      const isGameOver =
-        game.total_questions > 0 &&
-        game.current_question >= game.total_questions;
-
-      if (isGameOver) {
-        await this.prisma.game.update({
-          where: { id: gameId },
-          data: { status: 'COMPLETED', game_phase: 'GAME_OVER' },
-        });
-
-        const gameOverResponse = {
-          success: true,
-          message:
-            'The final question has been answered. The game is now complete!',
-          data: {
-            is_correct: isCorrect,
-            player_score: updatedPlayer.score,
-            next_action: 'GAME_OVER',
-            all_players_history: allPlayersHistory,
-            is_game_over: true,
-          },
-        };
-
-        if (isMultiPhoneGame) {
-          this.gatway.emitAnswerResult(roomId, gameOverResponse.data);
-        }
-        return gameOverResponse;
       }
 
       if (isCorrect) {
@@ -3128,25 +3201,25 @@ export class GamePlayerService {
           });
           let originalPlayerIndex = -1;
           if (firstAnswerer) {
-            originalPlayerIndex = game.game_players.findIndex(
+            originalPlayerIndex = updatedGame.game_players.findIndex(
               (p) => p.id === firstAnswerer.game_player_id,
             );
           }
           if (originalPlayerIndex !== -1) {
             nextTurnPlayer =
-              game.game_players[
-                (originalPlayerIndex + 1) % game.game_players.length
+              updatedGame.game_players[
+                (originalPlayerIndex + 0) % updatedGame.game_players.length
               ];
           } else {
-            nextTurnPlayer = game.game_players[0];
+            nextTurnPlayer = updatedGame.game_players[0];
           }
         } else {
-          const currentPlayerIndex = game.game_players.findIndex(
+          const currentPlayerIndex = updatedGame.game_players.findIndex(
             (p) => p.id === playerId,
           );
           nextTurnPlayer =
-            game.game_players[
-              (currentPlayerIndex + 1) % game.game_players.length
+            updatedGame.game_players[
+              (currentPlayerIndex + 0) % updatedGame.game_players.length
             ];
         }
 
@@ -3193,15 +3266,15 @@ export class GamePlayerService {
             },
             orderBy: { created_at: 'asc' },
           });
-          let nextPlayerForNewQuestion = game.game_players[0];
+          let nextPlayerForNewQuestion = updatedGame.game_players[0];
           if (firstAnswerer) {
-            const originalPlayerIndex = game.game_players.findIndex(
+            const originalPlayerIndex = updatedGame.game_players.findIndex(
               (p) => p.id === firstAnswerer.game_player_id,
             );
             if (originalPlayerIndex !== -1) {
               nextPlayerForNewQuestion =
-                game.game_players[
-                  (originalPlayerIndex + 1) % game.game_players.length
+                updatedGame.game_players[
+                  (originalPlayerIndex + 1) % updatedGame.game_players.length
                 ];
             }
           }
@@ -3280,7 +3353,6 @@ export class GamePlayerService {
       };
     }
   }
-
   // --- Helper Functions ---
 
   private async getAllPlayersHistory(players: any[]) {
@@ -3474,10 +3546,10 @@ export class GamePlayerService {
         game.total_questions > 0 &&
         game.current_question >= game.total_questions
       ) {
-        await this.prisma.game.update({
-          where: { id: gameId },
-          data: { status: 'completed', game_phase: 'GAME_OVER' },
-        });
+        // await this.prisma.game.update({
+        //   where: { id: gameId },
+        //   data: { status: 'completed', game_phase: 'GAME_OVER' },
+        // });
 
         throw new BadRequestException(
           'The game is complete. No more questions can be played.',
@@ -3493,7 +3565,7 @@ export class GamePlayerService {
         const lastPlayerIndex = game.game_players.findIndex(
           (p) => p.id === game.current_player_id,
         );
-        const nextPlayerIndex = (lastPlayerIndex + 0) % totalPlayers;
+        const nextPlayerIndex = (lastPlayerIndex + 1) % totalPlayers;
         currentPlayer = game.game_players[nextPlayerIndex];
       }
 

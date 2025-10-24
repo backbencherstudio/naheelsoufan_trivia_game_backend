@@ -1,4 +1,4 @@
-import fuzzball from 'fuzzball';
+import * as fuzzball from 'fuzzball';
 
 /**
  * Checks if a user's text answer is correct, handling semantic similarity and numeric ranges.
