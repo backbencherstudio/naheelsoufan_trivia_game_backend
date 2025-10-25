@@ -354,4 +354,117 @@ export class MultiplayerGameService {
       );
     }
   }
+
+  async findUnplayedGame(userId: string) {
+    try {
+      const unplayedOnlineGamePlayers = await this.prisma.gamePlayer.findMany({
+        where: {
+          user_id: userId,
+          game: {
+            game_phase: 'waiting',
+            rooms: {
+              some: {},
+            },
+          },
+        },
+        include: {
+          game: {
+            include: {
+              game_players: {
+                select: {
+                  id: true,
+                  player_name: true,
+                  player_order: true,
+                  score: true,
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      avatar: true,
+                    },
+                  },
+                },
+                orderBy: {
+                  player_order: 'asc',
+                },
+              },
+              language: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              rooms: {
+                select: {
+                  id: true,
+                  code: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      if (
+        !unplayedOnlineGamePlayers ||
+        unplayedOnlineGamePlayers.length === 0
+      ) {
+        return {
+          success: true,
+          message: 'No waiting online games found for this player.',
+          data: [],
+        };
+      }
+
+      const formattedGames = unplayedOnlineGamePlayers.map((gp) => {
+        const { game, ...playerInfo } = gp;
+        return {
+          game_info: {
+            id: game.id,
+            mode: game.mode,
+            status: game.status,
+            game_phase: game.game_phase,
+            current_question: game.current_question,
+            total_questions: game.total_questions,
+            current_player_id: game.current_player_id,
+            language: game.language,
+            room_code: game.rooms.length > 0 ? game.rooms[0].code : null,
+          },
+          your_player_info: {
+            id: playerInfo.id,
+            player_name: playerInfo.player_name,
+            player_order: playerInfo.player_order,
+            score: playerInfo.score,
+          },
+          all_players: game.game_players.map((p) => ({
+            id: p.id,
+            player_name: p.player_name,
+            player_order: p.player_order,
+            score: p.score,
+            user: p.user,
+          })),
+        };
+      });
+
+      return {
+        success: true,
+        message: `Found ${formattedGames.length} waiting online game(s).`,
+        data: formattedGames,
+      };
+    } catch (error) {
+      console.error(
+        `Error finding unplayed online games for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      return {
+        success: false,
+        message:
+          'An unexpected error occurred while searching for online games.',
+        statusCode: 500,
+      };
+    }
+  }
 }

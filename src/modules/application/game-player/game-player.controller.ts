@@ -342,10 +342,33 @@ export class GamePlayerController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Find unplayed game' })
   @Get('find-unplayed')
-  async findUnplayedGame(@Req() req: any) {
+  async findUnplayedGame(@Req() req: any, @Query() query: any) {
     try {
       const userId = req.user.userId;
-      const result = await this.gamePlayerService.findUnplayedGames(userId);
+      const { mode } = query;
+      const result = await this.gamePlayerService.findUnplayedGames(
+        userId,
+        mode,
+      );
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Rejoin unplayed game' })
+  @Post('rejoin-unplayed/:gameId')
+  async rejoinUnplayedGame(@Param('gameId') gameId: string, @Req() req: any) {
+    try {
+      const userId = req.user.userId;
+      const result = await this.gamePlayerService.rejoinUnplayedGame(
+        userId,
+        gameId,
+      );
       return result;
     } catch (error) {
       return {
