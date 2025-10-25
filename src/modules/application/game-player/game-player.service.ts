@@ -1169,6 +1169,102 @@ export class GamePlayerService {
       };
     }
   }
+
+  // Get UnPlayed Games for a User
+  async findUnplayedGames(userId: string) {
+    try {
+      const unplayedGamePlayer = await this.prisma.gamePlayer.findFirst({
+        where: {
+          user_id: userId,
+          game: {
+            status: 'active',
+          },
+        },
+        include: {
+          game: {
+            include: {
+              game_players: {
+                select: {
+                  id: true,
+                  player_name: true,
+                  player_order: true,
+                  score: true,
+                  user_id: true,
+                },
+                orderBy: {
+                  player_order: 'asc',
+                },
+              },
+
+              language: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+
+              rooms: {
+                select: {
+                  id: true,
+                  code: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      if (!unplayedGamePlayer) {
+        return {
+          success: true,
+          message: 'No active games found for this player.',
+          data: null,
+        };
+      }
+
+      const { game, ...playerInfo } = unplayedGamePlayer;
+
+      return {
+        success: true,
+        message: 'Active game found. Resuming session.',
+        data: {
+          game_info: {
+            id: game.id,
+            mode: game.mode,
+            status: game.status,
+            game_phase: game.game_phase,
+            current_question: game.current_question,
+            total_questions: game.total_questions,
+            current_player_id: game.current_player_id,
+            language: game.language,
+            room_code: game.rooms.length > 0 ? game.rooms[0].code : null,
+          },
+          player_info: {
+            id: playerInfo.id,
+            player_name: playerInfo.player_name,
+            player_order: playerInfo.player_order,
+            score: playerInfo.score,
+          },
+          all_players: game.game_players,
+        },
+      };
+    } catch (error) {
+      console.error(
+        `Error finding unplayed game for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      return {
+        success: false,
+        message:
+          'An unexpected error occurred while searching for active games.',
+        statusCode: 500,
+      };
+    }
+  }
+
   // Get comprehensive game results with rankings and leaderboard
   async getGameResults(gameId: string) {
     try {
@@ -3648,12 +3744,22 @@ export class GamePlayerService {
       const correctAnswer = selectedQuestion.answers.find(
         (a) => a.is_correct === true,
       );
+
+      let fileUrl = null;
+      if (selectedQuestion.file_url) {
+        const file_url = SojebStorage.url(
+          appConfig().storageUrl.question + selectedQuestion.file_url,
+        );
+
+        fileUrl = file_url;
+      }
+
       const formattedQuestion = {
         id: selectedQuestion.id,
         text: selectedQuestion.text,
         points: selectedQuestion.points,
         time_limit: selectedQuestion.time,
-        file_url: selectedQuestion.file_url,
+        file_url: fileUrl,
         question_type: selectedQuestion.question_type,
         answers: selectedQuestion.answers.map((a) => ({
           id: a.id,
