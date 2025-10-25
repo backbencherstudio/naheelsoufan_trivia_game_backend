@@ -339,6 +339,22 @@ export class GamePlayerController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Find unplayed game' })
+  @Get('find-unplayed')
+  async findUnplayedGame(@Req() req: any) {
+    try {
+      const userId = req.user.userId;
+      const result = await this.gamePlayerService.findUnplayedGames(userId);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
   @ApiOperation({
     summary: 'Get comprehensive game results with rankings and leaderboard',
   })
