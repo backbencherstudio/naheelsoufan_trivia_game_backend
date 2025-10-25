@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { JoinGameDto, LeaveGameDto } from './dto/join-game.dto';
+import { GameMode } from '@prisma/client';
 import { AnswerQuestionDto, SkipQuestionDto } from './dto/answer-question.dto';
 import {
   StartGameDto,
@@ -1171,44 +1172,36 @@ export class GamePlayerService {
   }
 
   // Get UnPlayed Games for a User
-  async findUnplayedGames(userId: string) {
+  async findUnplayedGames(userId: string, mode: string) {
     try {
-      const unplayedGamePlayer = await this.prisma.gamePlayer.findFirst({
+      const unplayedGames = await this.prisma.game.findMany({
         where: {
-          user_id: userId,
-          game: {
-            status: 'active',
+          host_id: userId,
+          game_phase: 'waiting',
+          mode: mode as GameMode,
+          rooms: {
+            none: {},
           },
         },
+
         include: {
-          game: {
-            include: {
-              game_players: {
-                select: {
-                  id: true,
-                  player_name: true,
-                  player_order: true,
-                  score: true,
-                  user_id: true,
-                },
-                orderBy: {
-                  player_order: 'asc',
-                },
-              },
-
-              language: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-
-              rooms: {
-                select: {
-                  id: true,
-                  code: true,
-                },
-              },
+          game_players: {
+            select: {
+              id: true,
+              player_name: true,
+              player_order: true,
+              score: true,
+              user_id: true,
+              is_guest: true,
+            },
+            orderBy: {
+              player_order: 'asc',
+            },
+          },
+          language: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
@@ -1217,19 +1210,110 @@ export class GamePlayerService {
         },
       });
 
-      if (!unplayedGamePlayer) {
+      if (!unplayedGames || unplayedGames.length === 0) {
         return {
           success: true,
-          message: 'No active games found for this player.',
-          data: null,
+          message: `No waiting ${mode.replace('_', ' ')} games found for this player.`,
+          data: [],
         };
       }
 
-      const { game, ...playerInfo } = unplayedGamePlayer;
+      const formattedGames = unplayedGames.map((game) => {
+        const hostPlayerInfo = game.game_players.find(
+          (p) => p.user_id === userId && !p.is_guest,
+        );
+
+        return {
+          game_info: {
+            id: game.id,
+            mode: game.mode,
+            status: game.status,
+            game_phase: game.game_phase,
+            current_question: game.current_question,
+            total_questions: game.total_questions,
+            current_player_id: game.current_player_id,
+            language: game.language,
+            room_code: null,
+          },
+          your_player_info: hostPlayerInfo
+            ? {
+                id: hostPlayerInfo.id,
+                player_name: hostPlayerInfo.player_name,
+                player_order: hostPlayerInfo.player_order,
+                score: hostPlayerInfo.score,
+              }
+            : null,
+          all_players: game.game_players,
+        };
+      });
 
       return {
         success: true,
-        message: 'Active game found. Resuming session.',
+        message: `Found ${formattedGames.length} waiting ${mode.replace('_', ' ')} game(s).`,
+        data: formattedGames,
+      };
+    } catch (error) {
+      console.error(
+        `Error finding unplayed games for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      return {
+        success: false,
+        message:
+          'An unexpected error occurred while searching for active games.',
+        statusCode: 500,
+      };
+    }
+  }
+
+  // Rejoin a game using game ID
+  async rejoinUnplayedGame(userId: string, gameId: string) {
+    try {
+      const game = await this.prisma.game.findUnique({
+        where: {
+          id: gameId,
+          rooms: {
+            none: {},
+          },
+        },
+        include: {
+          game_players: {
+            select: {
+              id: true,
+              player_name: true,
+              player_order: true,
+              score: true,
+              user_id: true,
+              is_guest: true,
+            },
+            orderBy: {
+              player_order: 'asc',
+            },
+          },
+          language: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!game) {
+        return {
+          success: false,
+          message: 'Offline game not found.',
+          statusCode: 404,
+        };
+      }
+
+      const hostPlayer = game.game_players.find(
+        (p) => p.user_id === userId && !p.is_guest,
+      );
+
+      return {
+        success: true,
+        message: 'Game session data retrieved successfully.',
         data: {
           game_info: {
             id: game.id,
@@ -1240,26 +1324,23 @@ export class GamePlayerService {
             total_questions: game.total_questions,
             current_player_id: game.current_player_id,
             language: game.language,
-            room_code: game.rooms.length > 0 ? game.rooms[0].code : null,
           },
-          player_info: {
-            id: playerInfo.id,
-            player_name: playerInfo.player_name,
-            player_order: playerInfo.player_order,
-            score: playerInfo.score,
-          },
+          your_player_info: hostPlayer
+            ? {
+                id: hostPlayer.id,
+                player_name: hostPlayer.player_name,
+                player_order: hostPlayer.player_order,
+                score: hostPlayer.score,
+              }
+            : null,
           all_players: game.game_players,
         },
       };
     } catch (error) {
-      console.error(
-        `Error finding unplayed game for user ${userId}: ${error.message}`,
-        error.stack,
-      );
+      console.error(`Error rejoining game: ${error.message}`, error.stack);
       return {
         success: false,
-        message:
-          'An unexpected error occurred while searching for active games.',
+        message: 'An unexpected error occurred while rejoining the game.',
         statusCode: 500,
       };
     }

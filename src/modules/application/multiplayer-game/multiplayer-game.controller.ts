@@ -6,6 +6,7 @@ import {
   UseGuards,
   Param,
   Patch,
+  Get,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MultiplayerGameService } from './multiplayer-game.service';
@@ -58,5 +59,19 @@ export class MultiplayerGameController {
   async gridJoinGame(@Param('identifier') identifier: string, @Req() req: any) {
     const userId = req.user.userId;
     return this.multiplayerGameService.joinGame(identifier, userId, 2);
+  }
+
+  @ApiOperation({ summary: 'Find unplayed game' })
+  @Get('find-unplayed')
+  async findUnplayedGame(@Req() req: any) {
+    try {
+      const userId = req.user.userId;
+      return this.multiplayerGameService.findUnplayedGame(userId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
   }
 }
