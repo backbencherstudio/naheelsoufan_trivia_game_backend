@@ -3451,7 +3451,7 @@ export class GamePlayerService {
             if (originalPlayerIndex !== -1) {
               nextPlayerForNewQuestion =
                 updatedGame.game_players[
-                  (originalPlayerIndex + 1) % updatedGame.game_players.length
+                  (originalPlayerIndex + 0) % updatedGame.game_players.length
                 ];
             }
           }
