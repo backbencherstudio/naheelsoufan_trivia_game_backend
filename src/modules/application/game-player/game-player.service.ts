@@ -3265,23 +3265,9 @@ export class GamePlayerService {
           where: { id: playerId },
           data: {
             score: { increment: pointsEarned },
-            ...(isCorrect
-              ? { correct_answers: { increment: 1 } }
-              : { wrong_answers: { increment: 1 } }),
           },
         }),
       ];
-
-      if (shouldIncrementQuestion) {
-        transactionOperations.push(
-          this.prisma.game.update({
-            where: { id: gameId },
-            data: {
-              current_question: { increment: 1 },
-            },
-          }),
-        );
-      }
 
       await this.prisma.$transaction(transactionOperations);
 
@@ -3334,7 +3320,7 @@ export class GamePlayerService {
       }
 
       // Rest of your existing logic for non-game-over scenarios
-      let isRoundOver = false;
+      let isRoundOver = true;
       const lastPlayerInOrder =
         updatedGame.game_players[updatedGame.game_players.length - 1];
 
@@ -3385,7 +3371,7 @@ export class GamePlayerService {
           if (originalPlayerIndex !== -1) {
             nextTurnPlayer =
               updatedGame.game_players[
-                (originalPlayerIndex + 0) % updatedGame.game_players.length
+                originalPlayerIndex % updatedGame.game_players.length
               ];
           } else {
             nextTurnPlayer = updatedGame.game_players[0];
@@ -3396,7 +3382,7 @@ export class GamePlayerService {
           );
           nextTurnPlayer =
             updatedGame.game_players[
-              (currentPlayerIndex + 0) % updatedGame.game_players.length
+              currentPlayerIndex % updatedGame.game_players.length
             ];
         }
 
@@ -3723,11 +3709,6 @@ export class GamePlayerService {
         game.total_questions > 0 &&
         game.current_question >= game.total_questions
       ) {
-        // await this.prisma.game.update({
-        //   where: { id: gameId },
-        //   data: { status: 'completed', game_phase: 'GAME_OVER' },
-        // });
-
         throw new BadRequestException(
           'The game is complete. No more questions can be played.',
         );
