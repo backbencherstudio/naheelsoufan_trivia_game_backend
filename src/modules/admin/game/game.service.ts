@@ -49,6 +49,26 @@ export class GameService {
               name: { contains: searchQuery, mode: 'insensitive' }
             }
           },
+          // Search in host name and email
+          {
+            host: {
+              name: { contains: searchQuery, mode: 'insensitive' }
+            }
+          },
+          {
+            host: {
+              email: { contains: searchQuery, mode: 'insensitive' }
+            }
+          },
+          // Search in game players' names
+          {
+            game_players: {
+              some: {
+                player_name: { contains: searchQuery, mode: 'insensitive' }
+              }
+            }
+          },
+
         ];
 
         // Check if searchQuery matches any GameMode enum values (case-insensitive)
