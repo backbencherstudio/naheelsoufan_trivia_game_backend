@@ -3155,7 +3155,7 @@ export class GamePlayerService {
         };
       }
 
-      console.log('Latest Game Question:', latestGameQuestion.question_id);
+      // console.log('Latest Game Question:', latestGameQuestion.question_id);
 
       const isMultiPhoneGame = game.rooms && game.rooms.length > 0;
       const roomId = isMultiPhoneGame ? game.rooms[0].id : null;
@@ -3265,9 +3265,23 @@ export class GamePlayerService {
           where: { id: playerId },
           data: {
             score: { increment: pointsEarned },
+            ...(isCorrect
+              ? { correct_answers: { increment: 1 } }
+              : { wrong_answers: { increment: 1 } }),
           },
         }),
       ];
+
+      if (shouldIncrementQuestion) {
+        transactionOperations.push(
+          this.prisma.game.update({
+            where: { id: gameId },
+            data: {
+              current_question: { increment: 0 },
+            },
+          }),
+        );
+      }
 
       await this.prisma.$transaction(transactionOperations);
 
