@@ -18,6 +18,7 @@ export class SubscriptionTypeService {
         select: {
           id: true,
           type: true,
+          game_mode: true,
           games: true,
           questions: true,
           players: true,
@@ -82,6 +83,7 @@ export class SubscriptionTypeService {
         select: {
           id: true,
           type: true,
+          game_mode: true,
           games: true,
           questions: true,
           players: true,
@@ -132,6 +134,7 @@ export class SubscriptionTypeService {
         select: {
           id: true,
           type: true,
+          game_mode: true,
           games: true,
           questions: true,
           players: true,
@@ -173,6 +176,7 @@ export class SubscriptionTypeService {
         select: {
           id: true,
           type: true,
+          game_mode: true,
           games: true,
           questions: true,
           players: true,

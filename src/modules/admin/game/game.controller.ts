@@ -24,7 +24,7 @@ import { Role } from '../../../common/guard/role/role.enum';
 @Roles(Role.ADMIN)
 @Controller('admin/games')
 export class GameController {
-  constructor(private readonly gameService: GameService) {}
+  constructor(private readonly gameService: GameService) { }
 
   @ApiOperation({ summary: 'Create a new game' })
   @Post()
@@ -42,12 +42,13 @@ export class GameController {
 
   @ApiOperation({ summary: 'Read all games' })
   @Get()
-  async findAll(@Query() query: { q?: string; page?: string; limit?: string }) {
+  async findAll(@Query() query: { q?: string; page?: string; limit?: string; details?: string }) {
     try {
       const searchQuery = query.q; // Optional search query
       const page = parseInt(query.page) || 1; // Default page is 1
       const limit = parseInt(query.limit) || 10; // Default limit is 10
-      const games = await this.gameService.findAll(searchQuery, page, limit);
+      const details = (query.details || 'false').toLowerCase() === 'true';
+      const games = await this.gameService.findAll(searchQuery, page, limit, details);
       return games;
     } catch (error) {
       return {

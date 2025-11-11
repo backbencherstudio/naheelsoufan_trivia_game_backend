@@ -38,7 +38,7 @@ export class GameService {
   }
 
   // Get all games with optional search and pagination
-  async findAll(searchQuery: string | null, page: number, limit: number) {
+  async findAll(searchQuery: string | null, page: number, limit: number, details = false) {
     try {
       const whereClause: any = {};
       if (searchQuery) {
@@ -88,48 +88,127 @@ export class GameService {
         where: whereClause,
       });
 
-      const games = await this.prisma.game.findMany({
+      const baseArgs: any = {
         where: whereClause,
         skip: (page - 1) * limit,
         take: limit,
-        select: {
-          id: true,
-          mode: true,
-          status: true,
-          created_at: true,
-          updated_at: true,
-          language: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
+        orderBy: { created_at: 'desc' },
+      };
+
+      let queryArgs: any;
+      if (details) {
+        queryArgs = {
+          ...baseArgs,
+          include: {
+            language: { select: { id: true, name: true, code: true } },
+            host: { select: { id: true, name: true, email: true } },
+            game_questions: {
+              orderBy: { created_at: 'asc' },
+              include: {
+                question: {
+                  select: {
+                    id: true,
+                    text: true,
+                    points: true,
+                    time: true,
+                    category: { select: { id: true, name: true } },
+                    difficulty: { select: { id: true, name: true } },
+                    answers: { select: { id: true, text: true, is_correct: true } },
+                  },
+                },
+              },
+            },
+            game_players: {
+              select: {
+                id: true,
+                player_name: true,
+                user: { select: { id: true, name: true, email: true } },
+                player_answers: {
+                  select: {
+                    question_id: true,
+                    answer_id: true,
+                    isCorrect: true,
+                    answer: { select: { id: true, text: true, is_correct: true } },
+                  },
+                  orderBy: { created_at: 'asc' },
+                },
+              },
             },
           },
-          host: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
+        };
+      } else {
+        queryArgs = {
+          ...baseArgs,
+          select: {
+            id: true,
+            mode: true,
+            status: true,
+            created_at: true,
+            updated_at: true,
+            language: { select: { id: true, name: true, code: true } },
+            host: { select: { id: true, name: true, email: true } },
+            game_players: { select: { id: true, player_name: true } },
+            _count: {
+              select: { game_players: true, rooms: true, leaderboards: true },
             },
           },
-          game_players: {
-            select: {
-              id: true,
-              player_name: true,
-            },
-          },
-          _count: {
-            select: {
-              game_players: true,
-              rooms: true,
-              leaderboards: true,
-            },
-          },
-        },
-        orderBy: {
-          created_at: 'desc',
-        },
-      });
+        };
+      }
+
+      const games = await this.prisma.game.findMany(queryArgs);
+
+      // If details requested, map into detailed DTO
+      const mapped =
+        details
+          ? games.map((g: any) => {
+            // Build answers by question map
+            const answersByQuestion = new Map<string, any[]>();
+            (g.game_players || []).forEach((p) => {
+              (p.player_answers || []).forEach((pa) => {
+                const arr = answersByQuestion.get(pa.question_id) || [];
+                arr.push({
+                  player_id: p.id,
+                  player_name: p.player_name,
+                  answer_text: pa.answer?.text || null,
+                  is_correct: !!pa.isCorrect,
+                });
+                answersByQuestion.set(pa.question_id, arr);
+              });
+            });
+
+            const questions = (g.game_questions || []).map((q) => {
+              return {
+                asked_at: q.created_at,
+                question_text: q.question?.text || null,
+                answers_by_players: answersByQuestion.get(q.question_id) || [],
+              };
+            });
+
+            // derive unique categories from the questions included in this game
+            const categoryMap = new Map<string, { id: string; name: string }>();
+            (g.game_questions || []).forEach((gq) => {
+              const cat = gq.question?.category;
+              if (cat && !categoryMap.has(cat.id)) {
+                categoryMap.set(cat.id, { id: cat.id, name: cat.name });
+              }
+            });
+            const categories_selected = Array.from(categoryMap.values());
+            const categories_selected_count = categories_selected.length;
+
+            return {
+              id: g.id,
+              mode: g.mode,
+              status: g.status,
+              created_at: g.created_at,
+              updated_at: g.updated_at,
+              language: g.language,
+              host: g.host,
+              questions,  // only question text and user answers
+              categories_selected,
+              categories_selected_count,
+            };
+          })
+          : games;
 
       const totalPages = Math.ceil(total / limit);
       const hasNextPage = page < totalPages;
@@ -137,8 +216,8 @@ export class GameService {
 
       return {
         success: true,
-        message: games.length ? 'Games retrieved successfully' : 'No games found',
-        data: games,
+        message: (games as any[]).length ? 'Games retrieved successfully' : 'No games found',
+        data: mapped,
         pagination: {
           total: total,
           page: page,

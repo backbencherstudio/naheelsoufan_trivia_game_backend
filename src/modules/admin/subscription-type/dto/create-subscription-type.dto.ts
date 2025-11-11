@@ -1,10 +1,15 @@
-import { IsString, IsNotEmpty, IsInt, IsNumber, Min, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, IsNumber, Min, IsOptional, IsEnum } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { GameMode } from '@prisma/client';
 
 export class CreateSubscriptionTypeDto {
     @IsString()
     @IsNotEmpty()
     type: string; // e.g., Premium, Standard, Platinum
+
+    @IsEnum(GameMode)
+    @IsNotEmpty()
+    game_mode: GameMode; // Game mode: QUICK_GAME or GRID_STYLE
 
     @IsInt()
     @Min(1)

@@ -373,17 +373,19 @@ model UserSetting {
 }
 
 model SubscriptionType {
-  id          String   @id @default(cuid())
-  type        String
-  games       Int
-  questions   Int
-  players     Int
-  price       Float
-  status      String
-  language_id String
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  language    Language @relation(fields: [language_id], references: [id])
+  id                     String   @id @default(cuid())
+  type                   String
+  game_mode              GameMode @default(QUICK_GAME)
+  games                  Int
+  questions              Int
+  players                Int
+  price                  Float
+  status                 String
+  max_category_selection Int?
+  language_id            String
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+  language               Language @relation(fields: [language_id], references: [id])
 
   subscriptions Subscription[]
 
@@ -448,19 +450,19 @@ model Game {
   host    User?   @relation(fields: [host_id], references: [id])
 
   current_player_id String? // Track whose turn it is
-  current_turn      Int           @default(1) // Turn counter
-  game_phase        String        @default("waiting") // waiting, category_selection, question, completed
-  total_questions   Int           @default(0) // Total questions in this game
-  current_question  Int           @default(0) // Current question number
+  current_turn      Int       @default(1) // Turn counter
+  game_phase        String    @default("waiting") // waiting, category_selection, question, completed
+  total_questions   Int       @default(0) // Total questions in this game
+  current_question  Int       @default(0) // Current question number
   question_asked_at DateTime?
   // Relations
 
-  subscription_id   String?
-  subscription      Subscription? @relation(fields: [subscription_id], references: [id])
+  subscription_id String?
+  subscription    Subscription? @relation(fields: [subscription_id], references: [id])
 
-  game_players      GamePlayer[] // Players in this game
-  rooms             Room[]
-  leaderboards      Leaderboard[]
+  game_players GamePlayer[] // Players in this game
+  rooms        Room[]
+  leaderboards Leaderboard[]
 
   game_questions GameQuestion[]
 
@@ -652,6 +654,7 @@ model Question {
   free_bundle      Boolean? // Whether this question is part of a free bundle (Yes/No)
   firebase         Boolean? // Whether this question is stored in Firebase (Yes/No)
   points           Int // Points awarded based on difficulty of the question
+ // max_repeat_count Int?  // Maximum number of times the question can be repeated in the player's turn
   created_at       DateTime @default(now()) // Automatically sets the creation date
   updated_at       DateTime @updatedAt // Automatically updates the last modified date
 

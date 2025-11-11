@@ -29,7 +29,7 @@ export class AuthService {
     private prisma: PrismaService,
     private mailService: MailService,
     @InjectRedis() private readonly redis: Redis,
-  ) {}
+  ) { }
 
   async me(userId: string) {
     try {
@@ -238,7 +238,7 @@ export class AuthService {
       if (user.type !== 'admin' && !user.email_verified_at) {
         return {
           success: false,
-          message: 'Your email is not verified. Please check your inbox.',
+          message: 'Your email is not verified.',
           data: {
             requires_verification: true,
           },
@@ -439,7 +439,7 @@ export class AuthService {
             data: { billing_id: stripeCustomer.id },
           });
         }
-      } catch (error) {}
+      } catch (error) { }
 
       // ----------------------------------------------------
       // // create otp code
