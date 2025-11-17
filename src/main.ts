@@ -24,20 +24,21 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-// app.use(
-//     session({
-//       secret: process.env.SESSION_SECRET || 'default_secret',
-//       resave: false,
-//       saveUninitialized: false,
-//       cookie: {
-//         secure: true, // https হলে true
-//       },
-//     }),
-//   );
+  // app.use(
+  //     session({
+  //       secret: process.env.SESSION_SECRET || 'default_secret',
+  //       resave: false,
+  //       saveUninitialized: false,
+  //       cookie: {
+  //         secure: true, // https হলে true
+  //       },
+  //     }),
+  //   );
 
   // Configure CORS with specific settings
   const allowedOrigins = [
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:6000',
     'https://naheelsoufan-dynamic-trivia-game-fr.vercel.app',
     '*',

@@ -20,7 +20,7 @@ import {
 
 @Injectable()
 export class SubscriptionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Get all subscription types for a language
@@ -87,15 +87,15 @@ export class SubscriptionService {
       updated_at: sub.updated_at,
       subscription_type: sub.subscription_type
         ? {
-            id: sub.subscription_type.id,
-            type: sub.subscription_type.type,
-            games: sub.subscription_type.games,
-            questions: sub.subscription_type.questions,
-            players: sub.subscription_type.players,
-            price: sub.subscription_type.price,
-            status: sub.subscription_type.status,
-            language_id: sub.subscription_type.language_id,
-          }
+          id: sub.subscription_type.id,
+          type: sub.subscription_type.type,
+          games: sub.subscription_type.games,
+          questions: sub.subscription_type.questions,
+          players: sub.subscription_type.players,
+          price: sub.subscription_type.price,
+          status: sub.subscription_type.status,
+          language_id: sub.subscription_type.language_id,
+        }
         : undefined,
     }));
 
@@ -384,15 +384,15 @@ export class SubscriptionService {
       updated_at: updatedSubscription.updated_at,
       subscription_type: updatedSubscription.subscription_type
         ? {
-            id: updatedSubscription.subscription_type.id,
-            type: updatedSubscription.subscription_type.type,
-            games: updatedSubscription.subscription_type.games,
-            questions: updatedSubscription.subscription_type.questions,
-            players: updatedSubscription.subscription_type.players,
-            price: updatedSubscription.subscription_type.price,
-            status: updatedSubscription.subscription_type.status,
-            language_id: updatedSubscription.subscription_type.language_id,
-          }
+          id: updatedSubscription.subscription_type.id,
+          type: updatedSubscription.subscription_type.type,
+          games: updatedSubscription.subscription_type.games,
+          questions: updatedSubscription.subscription_type.questions,
+          players: updatedSubscription.subscription_type.players,
+          price: updatedSubscription.subscription_type.price,
+          status: updatedSubscription.subscription_type.status,
+          language_id: updatedSubscription.subscription_type.language_id,
+        }
         : undefined,
     };
 
@@ -606,15 +606,15 @@ export class SubscriptionService {
       updated_at: subscription.updated_at,
       subscription_type: subscription.subscription_type
         ? {
-            id: subscription.subscription_type.id,
-            type: subscription.subscription_type.type,
-            games: subscription.subscription_type.games,
-            questions: subscription.subscription_type.questions,
-            players: subscription.subscription_type.players,
-            price: subscription.subscription_type.price,
-            status: subscription.subscription_type.status,
-            language_id: subscription.subscription_type.language_id,
-          }
+          id: subscription.subscription_type.id,
+          type: subscription.subscription_type.type,
+          games: subscription.subscription_type.games,
+          questions: subscription.subscription_type.questions,
+          players: subscription.subscription_type.players,
+          price: subscription.subscription_type.price,
+          status: subscription.subscription_type.status,
+          language_id: subscription.subscription_type.language_id,
+        }
         : undefined,
     };
 

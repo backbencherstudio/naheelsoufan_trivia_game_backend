@@ -30,6 +30,7 @@ export class CategoryService {
           id: true,
           name: true,
           image: true,
+          same_category_selection: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -125,6 +126,7 @@ export class CategoryService {
           id: true,
           name: true,
           image: true,
+          same_category_selection: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -177,6 +179,7 @@ export class CategoryService {
           id: true,
           name: true,
           image: true,
+          same_category_selection: true,
           created_at: true,
           updated_at: true,
           language: {
@@ -245,6 +248,7 @@ export class CategoryService {
           id: true,
           name: true,
           image: true,
+          same_category_selection: true,
           created_at: true,
           updated_at: true,
           language: {

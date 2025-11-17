@@ -18,6 +18,7 @@ export class SubscriptionResponseDto {
     subscription_type?: {
         id: string;
         type: string;
+        game_mode: string;
         games: number;
         questions: number;
         players: number;
@@ -44,6 +45,7 @@ export class SubscriptionStatusDto {
     games_remaining?: number;
     subscription_type: {
         type: string;
+        game_mode: string;
         games: number;
         questions: number;
         players: number;

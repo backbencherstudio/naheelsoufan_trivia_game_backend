@@ -9,7 +9,7 @@ export class SubscriptionService {
     /**
      * Get all subscribed users with their subscription details (with pagination)
      */
-    async getAllSubscribedUsers(searchQuery: string | null, page: number, limit: number, sort: string, order: string, status?: string) {
+    async getAllSubscribedUsers(searchQuery: string | null, page: number, limit: number, sort: string, order: string, status?: string,) {
         const skip = (page - 1) * limit;
 
         // Construct the search filter based on query and status
@@ -18,6 +18,8 @@ export class SubscriptionService {
         if (status) {
             whereClause.status = status;
         }
+
+        whereClause.payment_status = 'completed';
 
         if (searchQuery) {
             whereClause.OR = [
@@ -66,6 +68,7 @@ export class SubscriptionService {
                     select: {
                         id: true,
                         type: true,
+                        game_mode: true,
                         games: true,
                         questions: true,
                         players: true,
@@ -114,7 +117,6 @@ export class SubscriptionService {
             },
         };
     }
-
     /**
      * Get subscription statistics
      */
@@ -311,6 +313,7 @@ export class SubscriptionService {
                 subscription_type: {
                     select: {
                         type: true,
+                        game_mode: true,
                         games: true,
                         questions: true,
                         players: true,
