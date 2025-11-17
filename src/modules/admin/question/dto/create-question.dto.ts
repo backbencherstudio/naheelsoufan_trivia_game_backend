@@ -61,6 +61,10 @@ export class CreateQuestionDto {
     @Transform(({ value }) => Number(value))
     points: number;  // Points awarded based on difficulty of the question
 
+    @IsInt()
+    @Transform(({ value }) => Number(value))
+    repeat_count: number;  // Maximum number of times the question can be repeated in the player's turn
+
     @IsOptional()
     created_at?: Date;  // Automatically set by Prisma, optional
 

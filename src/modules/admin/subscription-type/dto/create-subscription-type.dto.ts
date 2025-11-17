@@ -5,11 +5,11 @@ import { GameMode } from '@prisma/client';
 export class CreateSubscriptionTypeDto {
     @IsString()
     @IsNotEmpty()
-    type: string; // e.g., Premium, Standard, Platinum
+    title: string; // e.g., Premium, Standard, Platinum
 
     @IsEnum(GameMode)
     @IsNotEmpty()
-    game_mode: GameMode; // Game mode: QUICK_GAME or GRID_STYLE
+    type: GameMode; // Game mode: QUICK_GAME or GRID_STYLE
 
     @IsInt()
     @Min(1)
