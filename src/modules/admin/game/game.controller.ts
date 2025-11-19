@@ -42,13 +42,22 @@ export class GameController {
 
   @ApiOperation({ summary: 'Read all games' })
   @Get()
-  async findAll(@Query() query: { q?: string; page?: string; limit?: string; details?: string }) {
+  async findAll(@Query() query: {
+    q?: string;
+    page?: string;
+    limit?: string;
+    details?: string;
+    mode?: string;
+    order?: string;
+  }) {
     try {
       const searchQuery = query.q; // Optional search query
       const page = parseInt(query.page) || 1; // Default page is 1
       const limit = parseInt(query.limit) || 10; // Default limit is 10
       const details = (query.details || 'false').toLowerCase() === 'true';
-      const games = await this.gameService.findAll(searchQuery, page, limit, details);
+      const mode = query.mode; // Filter by game mode (QUICK_GAME, GRID_STYLE)
+      const order = query.order || 'desc'; // Sort order (asc, desc)
+      const games = await this.gameService.findAll(searchQuery, page, limit, details, mode, order);
       return games;
     } catch (error) {
       return {

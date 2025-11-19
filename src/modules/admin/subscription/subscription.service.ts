@@ -68,7 +68,7 @@ export class SubscriptionService {
                     select: {
                         id: true,
                         type: true,
-                        game_mode: true,
+                        title: true,
                         games: true,
                         questions: true,
                         players: true,
@@ -313,7 +313,7 @@ export class SubscriptionService {
                 subscription_type: {
                     select: {
                         type: true,
-                        game_mode: true,
+                        title: true,
                         games: true,
                         questions: true,
                         players: true,
