@@ -38,7 +38,7 @@ export class GameService {
   }
 
   // Get all games with optional search and pagination
-  async findAll(searchQuery: string | null, page: number, limit: number, details = false) {
+  async findAll(searchQuery: string | null, page: number, limit: number, details = false, mode?: string, order: string = 'desc') {
     try {
       const whereClause: any = {};
       if (searchQuery) {
@@ -84,15 +84,26 @@ export class GameService {
         whereClause['OR'] = searchConditions;
       }
 
+      // Filter by game mode
+      if (mode) {
+        const upperMode = mode.toUpperCase();
+        if (upperMode === 'QUICK_GAME' || upperMode === 'GRID_STYLE') {
+          whereClause['mode'] = { equals: upperMode };
+        }
+      }
+
       const total = await this.prisma.game.count({
         where: whereClause,
       });
+
+      // Determine sort order
+      const sortOrder = (order || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
 
       const baseArgs: any = {
         where: whereClause,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: sortOrder },
       };
 
       let queryArgs: any;
