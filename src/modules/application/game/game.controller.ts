@@ -62,6 +62,49 @@ export class GameController {
     }
   }
 
+  // Get Category by game mode
+  @ApiOperation({
+    summary: 'Read all categories with optional search and language filter',
+  })
+  @Get('categories')
+  async findAllCategory(
+    @Query()
+    query: {
+      q?: string;
+      page?: number;
+      limit?: number;
+      language_id?: string;
+      mode?: string;
+      gameId?: string;
+      playerId?: string;
+    },
+  ) {
+    try {
+      const searchQuery = query.q; // Optional search query
+      const page = query.page ? Number(query.page) : 1;
+      const limit = query.limit ? Number(query.limit) : 10;
+      const languageId = query.language_id; // Optional language filter
+      const mode = query.mode;
+      const gameId = query.gameId;
+      const playerId = query.playerId;
+      const categories = await this.gameService.findAllCategory(
+        searchQuery,
+        page,
+        limit,
+        languageId,
+        mode,
+        gameId,
+        playerId,
+      ); // Fetch all categories
+      return categories;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message, // Return error message if fetching fails
+      };
+    }
+  }
+
   @ApiOperation({ summary: 'Read all games' })
   @Get()
   async findAll(@Query() query: { q?: string }) {

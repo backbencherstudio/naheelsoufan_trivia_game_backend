@@ -3759,9 +3759,8 @@ export class GamePlayerService {
         throw new NotFoundException('Category not found.');
       }
 
-      // console.log('Category data:', category);
-      const maxCategorySelections = category.same_category_selection ?? 5;
-      // console.log('max category selection', maxCategorySelections);
+      console.log('Category data:', category);
+      const maxCategorySelections = category.same_category_selection ?? 5; // Default to 2 if null
 
       const selectedQuestionsCountInThisCategoryByPlayer =
         await this.prisma.gameQuestion.count({
@@ -3829,75 +3828,19 @@ export class GamePlayerService {
         new Set(previouslyPlayedQuestionIds),
       );
 
-      const overRepeatedQuestionIds: string[] = [];
-
-      const baseWhereCondition: any = {
-        category_id: categoryId,
-        difficulty_id: difficultyId,
-      };
-
-      if (game.mode === 'GRID_STYLE') {
-        const textQuestionType = await this.prisma.questionType.findFirst({
-          where: {
-            name: 'Text',
-            language_id: game.language_id,
-          },
-          select: { id: true },
-        });
-
-        if (!textQuestionType) {
-          throw new InternalServerErrorException(
-            `Question type "Text" not found for language ID: ${game.language_id}`,
-          );
-        }
-        baseWhereCondition.question_type_id = textQuestionType.id;
-      }
-
-      if (isFreeGame) {
-        baseWhereCondition.free_bundle = true;
-      }
-
-      const potentialQuestions = await this.prisma.question.findMany({
-        where: baseWhereCondition,
-        select: {
-          id: true,
-          repeat_count: true,
-        },
-      });
-
-      const questionPlayCounts = await this.prisma.gameQuestion.groupBy({
-        by: ['question_id'],
-        where: {
-          question_id: { in: potentialQuestions.map((q) => q.id) },
-        },
-        _count: {
-          question_id: true,
-        },
-      });
-
-      const playCountMap = new Map<string, number>();
-      questionPlayCounts.forEach((item) => {
-        playCountMap.set(item.question_id, item._count.question_id);
-      });
-
-      for (const q of potentialQuestions) {
-        const currentPlayCount = playCountMap.get(q.id) ?? 0;
-        const maxRepeatCount = q.repeat_count ?? 5;
-
-        if (currentPlayCount >= maxRepeatCount) {
-          overRepeatedQuestionIds.push(q.id);
-        }
-      }
-
       const whereCondition: any = {
         category_id: categoryId,
         difficulty_id: difficultyId,
         id: {
-          notIn: [...previouslyPlayedQuestionIds, ...overRepeatedQuestionIds],
+          notIn: previouslyPlayedQuestionIds,
         },
       };
 
       if (game.mode === 'GRID_STYLE') {
+        console.log(
+          'GRID_STYLE mode detected: Fetching only "text" type questions.',
+        );
+
         const textQuestionType = await this.prisma.questionType.findFirst({
           where: {
             name: 'Text',
@@ -3911,6 +3854,7 @@ export class GamePlayerService {
             `Question type "Text" not found for language ID: ${game.language_id}`,
           );
         }
+
         whereCondition.question_type_id = textQuestionType.id;
       }
 
@@ -3933,31 +3877,27 @@ export class GamePlayerService {
       if (!allQuestions.length) {
         if (isFreeGame) {
           throw new BadRequestException(
-            'No new free questions available for selected category and difficulty (players may have played all, or reached global repeat limit)',
+            'No new free questions available for selected category and difficulty (players may have played all)',
           );
         } else {
           throw new BadRequestException(
-            'No new questions available for selected category and difficulty (players may have played all, or reached global repeat limit)',
+            'No new questions available for selected category and difficulty (players may have played all)',
           );
         }
       }
 
-      // previouslyPlayedQuestionIds এবং overRepeatedQuestionIds ইতিমধ্যে notIn এ আছে, তাই এই ফিল্টারটি এখন redundant
-      // const availableQuestions = allQuestions.filter(
-      //   (q) => !previouslyPlayedQuestionIds.includes(q.id),
-      // );
-
-      // সব filter হয়ে গেলে, যা বাকি আছে তাই availableQuestions
-      const availableQuestions = allQuestions;
+      const availableQuestions = allQuestions.filter(
+        (q) => !previouslyPlayedQuestionIds.includes(q.id),
+      );
 
       if (!availableQuestions.length) {
         if (isFreeGame) {
           throw new BadRequestException(
-            'All available free questions for this category/difficulty have been used in this game or reached global repeat limit',
+            'All available free questions for this category/difficulty have been used in this game',
           );
         } else {
           throw new BadRequestException(
-            'All available questions for this category/difficulty have been used in this game or reached global repeat limit',
+            'All available questions for this category/difficulty have been used in this game',
           );
         }
       }

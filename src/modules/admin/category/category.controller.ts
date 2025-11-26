@@ -41,6 +41,7 @@ export class CategoryController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
   @ApiOperation({
     summary: 'Read all categories with optional search and language filter',
   })
