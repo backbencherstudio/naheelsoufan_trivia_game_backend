@@ -516,6 +516,7 @@ model GamePlayer {
   is_guest        Boolean         @default(false)
   player_answers  PlayerAnswer[]
   game_selections GameSelection[]
+  gameQuestions   GameQuestion[]
 
   @@map("game_players")
 }
@@ -670,15 +671,17 @@ model Question {
 }
 
 model GameQuestion {
-  id          String   @id @default(cuid())
-  game_id     String
-  question_id String
-  created_at  DateTime @default(now())
+  id             String   @id @default(cuid())
+  game_id        String
+  question_id    String
+  game_player_id String?
+  created_at     DateTime @default(now())
 
-  game     Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  question Question @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  game        Game        @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  question    Question    @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  game_player GamePlayer? @relation(fields: [game_player_id], references: [id])
 
-  @@unique([game_id, question_id]) // same game এ এক প্রশ্ন repeat হবে না
+  @@unique([game_id, question_id])
 }
 
 model Answer {

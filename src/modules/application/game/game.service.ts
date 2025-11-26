@@ -2,15 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
+import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
+import appConfig from 'src/config/app.config';
+import { GamePlayerService } from '../game-player/game-player.service';
 
 @Injectable()
 export class GameService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gamePlayerService: GamePlayerService,
+  ) {}
 
   // Create a new game with subscription validation
   async create(createGameDto: CreateGameDto, user_id: string) {
     try {
-      // Check total games created across all types
       const totalGamesCount = await this.prisma.game.count({
         where: {
           host_id: user_id,
@@ -23,15 +28,17 @@ export class GameService {
       let activeSubscriptionId: string | null = null;
       let requiresSubscription = false;
 
-      // If user has already created any game (free one used), check for subscription
+      // If user has already created any game (free one used), check for specific subscription
       if (totalGamesCount > 0) {
         requiresSubscription = true;
 
-        // Check if user has an active subscription
         const activeSubscription = await this.prisma.subscription.findFirst({
           where: {
             user_id,
             status: 'active',
+            subscription_type: {
+              type: createGameDto.mode,
+            },
           },
           include: {
             subscription_type: true,
@@ -40,11 +47,14 @@ export class GameService {
 
         if (!activeSubscription) {
           const gameTypesCreated = await this.getGameTypesCreated(user_id);
+          const formattedModeName = createGameDto.mode.replace('_', ' ');
           return {
             success: false,
-            message: `No games remaining in your subscription. Please upgrade or purchase a new subscription.`,
+
+            message: `No active subscription found for ${formattedModeName}. Please purchase a ${formattedModeName} subscription to create this game.`,
             data: {
               requires_subscription: true,
+              required_subscription_type: createGameDto.mode,
               total_games_created: totalGamesCount,
               game_type: createGameDto.mode,
               game_types_created: gameTypesCreated,
@@ -69,8 +79,7 @@ export class GameService {
           });
           return {
             success: false,
-            message:
-              'No games remaining in your subscription. Please upgrade or purchase a new subscription.',
+            message: `No games remaining in your ${createGameDto.mode.replace('_', ' ')} subscription. Please upgrade or purchase a new subscription.`,
             data: {
               subscription_exhausted: true,
               games_limit: activeSubscription.subscription_type.games,
@@ -689,6 +698,140 @@ export class GameService {
       return {
         success: false,
         message: `Error fetching game statistics: ${error.message}`,
+      };
+    }
+  }
+
+  // Get all categories with optional search and language filter
+  async findAllCategory(
+    searchQuery: string | null,
+    page: number,
+    limit: number,
+    languageId?: string,
+    mode?: string,
+    gameId?: string,
+    playerId?: string,
+  ) {
+    try {
+      const whereClause: any = {};
+
+      if (searchQuery) {
+        whereClause['OR'] = [
+          { name: { contains: searchQuery, mode: 'insensitive' } },
+        ];
+      }
+      if (languageId) {
+        whereClause['language_id'] = languageId;
+      }
+
+      if (mode === 'GRID_STYLE') {
+        let questionTypeWhere: any = { name: 'Text' };
+        if (languageId) {
+          questionTypeWhere.language_id = languageId;
+        }
+
+        const textQuestionType = await this.prisma.questionType.findFirst({
+          where: questionTypeWhere,
+          select: { id: true },
+        });
+
+        if (textQuestionType) {
+          whereClause.questions = {
+            some: {
+              question_type_id: textQuestionType.id,
+            },
+          };
+        } else {
+          whereClause.id = 'impossible_id_to_return_empty_list';
+        }
+      }
+
+      const total = await this.prisma.category.count({ where: whereClause });
+
+      let categories = await this.prisma.category.findMany({
+        where: whereClause,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          same_category_selection: true,
+          created_at: true,
+          updated_at: true,
+          language: { select: { id: true, name: true } },
+        },
+      });
+
+      // Add image URLs
+      categories = categories.map((category) => {
+        let image_url = null;
+        if (category.image) {
+          image_url = SojebStorage.url(
+            appConfig().storageUrl.category + category.image,
+          );
+        }
+        return { ...category, image_url };
+      });
+
+      //Integrate player category selection counts into categories ---
+      if (gameId && playerId) {
+        // Only proceed if both gameId and playerId are provided
+        try {
+          const result =
+            await this.gamePlayerService.countPlayerCategorySelections(gameId);
+          if (result.success && result.data.length > 0) {
+            const playerSelections = result.data.find(
+              (p: any) => p.player_id === playerId,
+            );
+
+            if (playerSelections && playerSelections.category_counts) {
+              const playerCategoryMap = new Map<string, number>();
+              playerSelections.category_counts.forEach(
+                (item: { category_name: string; count: number }) => {
+                  playerCategoryMap.set(item.category_name, item.count);
+                },
+              );
+
+              // Map counts to the categories
+              categories = categories.map((category) => ({
+                ...category,
+                selected_count: playerCategoryMap.get(category.name) || 0,
+              }));
+            }
+          }
+        } catch (error) {
+          console.error(
+            `Error fetching player category selections for game ${gameId} and player ${playerId}:`,
+            error,
+          );
+        }
+      }
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        success: true,
+        message: categories.length
+          ? 'Categories retrieved successfully'
+          : 'No categories found',
+        data: categories,
+        pagination: {
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPreviousPage: hasPreviousPage,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'failed to fetch category',
       };
     }
   }

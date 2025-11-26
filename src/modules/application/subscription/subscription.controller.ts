@@ -41,9 +41,27 @@ export class SubscriptionController {
    * Get user's subscriptions
    */
   @Get('my-subscriptions')
-  async getUserSubscriptions(@Req() req: any) {
-    const user_id = req.user?.userId;
-    return await this.subscriptionService.getUserSubscriptions(user_id);
+  async getUserSubscriptions(@Req() req: any, @Query('type') type?: string) {
+    try {
+      const user_id = req.user?.userId;
+
+      if (type && !['QUICK_GAME', 'GRID_STYLE'].includes(type)) {
+        return {
+          success: false,
+          message:
+            'Invalid subscription type. Allowed values are QUICK_GAME or GRID_STYLE.',
+          data: [],
+        };
+      }
+
+      // Pass the type parameter to the service
+      return await this.subscriptionService.getUserSubscriptions(user_id, type);
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to fetch the subscription type',
+      };
+    }
   }
 
   /**
