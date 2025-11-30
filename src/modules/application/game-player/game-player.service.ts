@@ -3942,12 +3942,11 @@ export class GamePlayerService {
         }
       }
 
-      // previouslyPlayedQuestionIds এবং overRepeatedQuestionIds ইতিমধ্যে notIn এ আছে, তাই এই ফিল্টারটি এখন redundant
+      // previouslyPlayedQuestionIds and overRepeatedQuestionIds
       // const availableQuestions = allQuestions.filter(
       //   (q) => !previouslyPlayedQuestionIds.includes(q.id),
       // );
 
-      // সব filter হয়ে গেলে, যা বাকি আছে তাই availableQuestions
       const availableQuestions = allQuestions;
 
       if (!availableQuestions.length) {

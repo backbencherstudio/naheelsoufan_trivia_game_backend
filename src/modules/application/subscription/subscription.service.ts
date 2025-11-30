@@ -25,11 +25,15 @@ export class SubscriptionService {
   /**
    * Get all subscription types for a language
    */
-  async getSubscriptionTypes(language_id: string) {
+  async getSubscriptionTypes(language_id: string, type: string) {
+    const subscriptionTypeEnumValue = type as any;
+
     const data = await this.prisma.subscriptionType.findMany({
       where: {
-        language_id,
+        language_id: language_id,
         status: 'active',
+
+        type: subscriptionTypeEnumValue,
       },
       orderBy: {
         price: 'asc',
