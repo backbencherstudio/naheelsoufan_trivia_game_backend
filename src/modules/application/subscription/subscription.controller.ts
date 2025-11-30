@@ -33,8 +33,14 @@ export class SubscriptionController {
    * Get all available subscription types for a language
    */
   @Get('types')
-  async getSubscriptionTypes(@Query('language_id') language_id: string) {
-    return await this.subscriptionService.getSubscriptionTypes(language_id);
+  async getSubscriptionTypes(
+    @Query('language_id') language_id: string,
+    @Query('type') type: string,
+  ) {
+    return await this.subscriptionService.getSubscriptionTypes(
+      language_id,
+      type,
+    );
   }
 
   /**
