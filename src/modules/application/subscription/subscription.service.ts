@@ -52,28 +52,18 @@ export class SubscriptionService {
    */
   async getUserSubscriptions(user_id: string, type?: string) {
     if (!user_id) {
-      return {
-        success: false,
-        message: 'User not authenticated',
-        data: [],
-      };
-    }
-
-    if (!type) {
-      return {
-        success: false,
-        message:
-          'Please provide a subscription type (e.g., QUICK_GAME or GRID_STYLE) to filter.',
-        data: [],
-      };
+      throw new BadRequestException('User not authenticated');
     }
 
     const whereCondition: any = {
       user_id,
-      subscription_type: {
-        type: type,
-      },
     };
+
+    if (type) {
+      whereCondition.subscription_type = {
+        type: type,
+      };
+    }
 
     // Fetch subscriptions based on the condition
     const subscriptions = await this.prisma.subscription.findMany({
@@ -120,19 +110,28 @@ export class SubscriptionService {
     }));
 
     // Adjust message based on whether data was found
-    const formattedType = type.replace('_', ' ');
-    let message = `${formattedType} subscriptions retrieved successfully`;
+    let message: string;
+    let successStatus: boolean = true;
 
     if (data.length === 0) {
-      return {
-        success: false,
-        message: `No subscriptions found for ${formattedType}.`,
-        data: [],
-      };
+      successStatus = false;
+      if (type) {
+        const formattedType = type.replace('_', ' ');
+        message = `No subscriptions found for ${formattedType}.`;
+      } else {
+        message = `No subscriptions found for the user.`;
+      }
+    } else {
+      if (type) {
+        const formattedType = type.replace('_', ' ');
+        message = `${formattedType} subscriptions retrieved successfully`;
+      } else {
+        message = 'All subscriptions retrieved successfully';
+      }
     }
 
     return {
-      success: true,
+      success: successStatus,
       message: message,
       data,
     };
