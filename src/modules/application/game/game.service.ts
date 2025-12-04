@@ -714,7 +714,9 @@ export class GameService {
   ) {
     try {
       const whereClause: any = {};
+      const skip = (page - 1) * limit;
 
+      // --- 1. Base Filters (Search and Language) ---
       if (searchQuery) {
         whereClause['OR'] = [
           { name: { contains: searchQuery, mode: 'insensitive' } },
@@ -724,6 +726,8 @@ export class GameService {
         whereClause['language_id'] = languageId;
       }
 
+      // --- 2. GRID_STYLE Mode Logic (Filter by 'Text' Question Type) ---
+      let textQuestionTypeId: string | null = null;
       if (mode === 'GRID_STYLE') {
         let questionTypeWhere: any = { name: 'Text' };
         if (languageId) {
@@ -736,21 +740,25 @@ export class GameService {
         });
 
         if (textQuestionType) {
+          textQuestionTypeId = textQuestionType.id;
+          // Filter categories to only include those that have at least one text question
           whereClause.questions = {
             some: {
-              question_type_id: textQuestionType.id,
+              question_type_id: textQuestionTypeId,
             },
           };
         } else {
+          // If 'Text' question type doesn't exist, ensure an empty list is returned
           whereClause.id = 'impossible_id_to_return_empty_list';
         }
       }
 
+      // --- 3. Pagination Setup and Data Fetch ---
       const total = await this.prisma.category.count({ where: whereClause });
 
       let categories = await this.prisma.category.findMany({
         where: whereClause,
-        skip: (page - 1) * limit,
+        skip: skip,
         take: limit,
         orderBy: { created_at: 'desc' },
         select: {
@@ -761,23 +769,49 @@ export class GameService {
           created_at: true,
           updated_at: true,
           language: { select: { id: true, name: true } },
+          // Use Prisma's aggregation to count related questions
+          _count: {
+            select: {
+              questions:
+                // Conditional count: if in GRID_STYLE, count only 'Text' questions
+                mode === 'GRID_STYLE' && textQuestionTypeId
+                  ? {
+                      where: {
+                        question_type_id: textQuestionTypeId,
+                      },
+                    }
+                  : true, // Otherwise, count all questions
+            },
+          },
         },
       });
 
-      // Add image URLs
-      categories = categories.map((category) => {
+      // --- 4. Mapping: Image URL and Question Count ---
+      let finalCategories = categories.map((category) => {
         let image_url = null;
         if (category.image) {
+          // Correctly generate the image URL
           image_url = SojebStorage.url(
             appConfig().storageUrl.category + category.image,
           );
         }
-        return { ...category, image_url };
+
+        return {
+          id: category.id,
+          name: category.name,
+          image: category.image,
+          same_category_selection: category.same_category_selection,
+          created_at: category.created_at,
+          updated_at: category.updated_at,
+          language: category.language,
+          image_url: image_url,
+          // Map the aggregated question count
+          question_count: category._count.questions,
+        };
       });
 
-      //Integrate player category selection counts into categories ---
+      // --- 5. Integration: Player Category Selection Counts ---
       if (gameId && playerId) {
-        // Only proceed if both gameId and playerId are provided
         try {
           const result =
             await this.gamePlayerService.countPlayerCategorySelections(gameId);
@@ -795,13 +829,14 @@ export class GameService {
               );
 
               // Map counts to the categories
-              categories = categories.map((category) => ({
+              finalCategories = finalCategories.map((category) => ({
                 ...category,
                 selected_count: playerCategoryMap.get(category.name) || 0,
               }));
             }
           }
         } catch (error) {
+          // Log error but continue with fetching categories
           console.error(
             `Error fetching player category selections for game ${gameId} and player ${playerId}:`,
             error,
@@ -809,16 +844,17 @@ export class GameService {
         }
       }
 
+      // --- 6. Final Response and Pagination ---
       const totalPages = Math.ceil(total / limit);
       const hasNextPage = page < totalPages;
       const hasPreviousPage = page > 1;
 
       return {
         success: true,
-        message: categories.length
+        message: finalCategories.length
           ? 'Categories retrieved successfully'
           : 'No categories found',
-        data: categories,
+        data: finalCategories,
         pagination: {
           total: total,
           page: page,
@@ -829,9 +865,11 @@ export class GameService {
         },
       };
     } catch (error) {
+      // Log the full error for debugging purposes
+      console.error('Failed to fetch category:', error);
       return {
         success: false,
-        message: 'failed to fetch category',
+        message: 'Failed to fetch category',
       };
     }
   }
