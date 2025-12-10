@@ -11,7 +11,7 @@ export class GameService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamePlayerService: GamePlayerService,
-  ) {}
+  ) { }
 
   // Create a new game with subscription validation
   async create(createGameDto: CreateGameDto, user_id: string) {
@@ -714,6 +714,7 @@ export class GameService {
   ) {
     try {
       const whereClause: any = {};
+      const questionCountWhere: any = {};
       const skip = (page - 1) * limit;
 
       // --- 1. Base Filters (Search and Language) ---
@@ -747,10 +748,36 @@ export class GameService {
               question_type_id: textQuestionTypeId,
             },
           };
+          questionCountWhere.question_type_id = textQuestionTypeId;
         } else {
           // If 'Text' question type doesn't exist, ensure an empty list is returned
           whereClause.id = 'impossible_id_to_return_empty_list';
         }
+      }
+
+      // --- 2.1 Free Game Filter ---
+      if (gameId) {
+        const game = await this.prisma.game.findUnique({
+          where: { id: gameId },
+          select: { subscription_id: true },
+        });
+
+        // If game exists and has no subscription, it's a free game
+        if (game && !game.subscription_id) {
+          if (!whereClause.questions) {
+            whereClause.questions = { some: {} };
+          }
+          // Add free_bundle constraint
+          whereClause.questions.some.free_bundle = true;
+          questionCountWhere.free_bundle = true;
+        }
+      }
+
+      // Ensure only categories with at least one question are returned
+      if (!whereClause.questions) {
+        whereClause.questions = {
+          some: {},
+        };
       }
 
       // --- 3. Pagination Setup and Data Fetch ---
@@ -773,14 +800,9 @@ export class GameService {
           _count: {
             select: {
               questions:
-                // Conditional count: if in GRID_STYLE, count only 'Text' questions
-                mode === 'GRID_STYLE' && textQuestionTypeId
-                  ? {
-                      where: {
-                        question_type_id: textQuestionTypeId,
-                      },
-                    }
-                  : true, // Otherwise, count all questions
+                Object.keys(questionCountWhere).length > 0
+                  ? { where: questionCountWhere }
+                  : true,
             },
           },
         },
@@ -829,10 +851,15 @@ export class GameService {
               );
 
               // Map counts to the categories
-              finalCategories = finalCategories.map((category) => ({
-                ...category,
-                selected_count: playerCategoryMap.get(category.name) || 0,
-              }));
+              finalCategories = finalCategories
+                .map((category) => ({
+                  ...category,
+                  selected_count: playerCategoryMap.get(category.name) || 0,
+                }))
+                .filter(
+                  (category) =>
+                    category.selected_count < category.same_category_selection,
+                );
             }
           }
         } catch (error) {
