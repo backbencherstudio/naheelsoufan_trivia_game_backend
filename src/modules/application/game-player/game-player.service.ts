@@ -3698,7 +3698,9 @@ export class GamePlayerService {
         let totalQuestionsForGame;
         const numberOfPlayers = game.game_players.length;
 
-        if (
+        if (game.mode === 'GRID_STYLE') {
+          totalQuestionsForGame = 36;
+        } else if (
           game.subscription &&
           game.subscription.subscription_type.questions > 0
         ) {
