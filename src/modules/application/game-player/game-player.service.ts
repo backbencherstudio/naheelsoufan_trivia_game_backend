@@ -26,7 +26,7 @@ export class GamePlayerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gatway: MessageGateway,
-  ) {}
+  ) { }
 
   // Join a game
   async joinGame(userId: string, joinGameDto: JoinGameDto) {
@@ -1237,11 +1237,11 @@ export class GamePlayerService {
           },
           your_player_info: hostPlayerInfo
             ? {
-                id: hostPlayerInfo.id,
-                player_name: hostPlayerInfo.player_name,
-                player_order: hostPlayerInfo.player_order,
-                score: hostPlayerInfo.score,
-              }
+              id: hostPlayerInfo.id,
+              player_name: hostPlayerInfo.player_name,
+              player_order: hostPlayerInfo.player_order,
+              score: hostPlayerInfo.score,
+            }
             : null,
           all_players: game.game_players,
         };
@@ -1327,11 +1327,11 @@ export class GamePlayerService {
           },
           your_player_info: hostPlayer
             ? {
-                id: hostPlayer.id,
-                player_name: hostPlayer.player_name,
-                player_order: hostPlayer.player_order,
-                score: hostPlayer.score,
-              }
+              id: hostPlayer.id,
+              player_name: hostPlayer.player_name,
+              player_order: hostPlayer.player_order,
+              score: hostPlayer.score,
+            }
             : null,
           all_players: game.game_players,
         },
@@ -1452,10 +1452,10 @@ export class GamePlayerService {
             accuracy:
               player.correct_answers + player.wrong_answers > 0
                 ? (
-                    (player.correct_answers /
-                      (player.correct_answers + player.wrong_answers)) *
-                    100
-                  ).toFixed(2) + '%'
+                  (player.correct_answers /
+                    (player.correct_answers + player.wrong_answers)) *
+                  100
+                ).toFixed(2) + '%'
                 : '0%',
             player_order: player.player_order,
             created_at: player.created_at,
@@ -1474,24 +1474,24 @@ export class GamePlayerService {
           game_statistics: {
             winner: winner
               ? {
-                  user: winner.user,
-                  score: winner.score,
-                  accuracy:
-                    winner.correct_answers + winner.wrong_answers > 0
-                      ? (
-                          (winner.correct_answers /
-                            (winner.correct_answers + winner.wrong_answers)) *
-                          100
-                        ).toFixed(2) + '%'
-                      : '0%',
-                }
+                user: winner.user,
+                score: winner.score,
+                accuracy:
+                  winner.correct_answers + winner.wrong_answers > 0
+                    ? (
+                      (winner.correct_answers /
+                        (winner.correct_answers + winner.wrong_answers)) *
+                      100
+                    ).toFixed(2) + '%'
+                    : '0%',
+              }
               : null,
             top_performer: topPerformer
               ? {
-                  user: topPerformer.user,
-                  score: topPerformer.score,
-                  correct_answers: topPerformer.correct_answers,
-                }
+                user: topPerformer.user,
+                score: topPerformer.score,
+                correct_answers: topPerformer.correct_answers,
+              }
               : null,
             average_score: Math.round(averageScore * 100) / 100,
             total_questions_per_player: Math.round(totalQuestions),
@@ -2512,8 +2512,8 @@ export class GamePlayerService {
           .filter((id) => id !== null);
         throw new NotFoundException(
           `User not found in this game. ` +
-            `Looking for user ID: ${userId}. ` +
-            `Available user IDs: ${availableUserIds.join(', ')}`,
+          `Looking for user ID: ${userId}. ` +
+          `Available user IDs: ${availableUserIds.join(', ')}`,
         );
       }
 
@@ -3275,16 +3275,16 @@ export class GamePlayerService {
         }),
       ];
 
-      if (shouldIncrementQuestion) {
-        transactionOperations.push(
-          this.prisma.game.update({
-            where: { id: gameId },
-            data: {
-              current_question: { increment: 1 },
-            },
-          }),
-        );
-      }
+      // if (shouldIncrementQuestion) {
+      //   transactionOperations.push(
+      //     this.prisma.game.update({
+      //       where: { id: gameId },
+      //       data: {
+      //         current_question: { increment: 0 }, 
+      //       },
+      //     }),
+      //   );
+      // }
 
       await this.prisma.$transaction(transactionOperations);
 
@@ -3386,7 +3386,7 @@ export class GamePlayerService {
           if (originalPlayerIndex !== -1) {
             nextTurnPlayer =
               updatedGame.game_players[
-                (originalPlayerIndex + 1) % updatedGame.game_players.length
+              (originalPlayerIndex + 1) % updatedGame.game_players.length
               ];
           } else {
             nextTurnPlayer = updatedGame.game_players[0];
@@ -3397,7 +3397,7 @@ export class GamePlayerService {
           );
           nextTurnPlayer =
             updatedGame.game_players[
-              (currentPlayerIndex + 1) % updatedGame.game_players.length
+            (currentPlayerIndex + 1) % updatedGame.game_players.length
             ];
         }
 
@@ -3452,7 +3452,7 @@ export class GamePlayerService {
           if (originalPlayerIndex !== -1) {
             nextPlayerForNewQuestion =
               updatedGame.game_players[
-                (originalPlayerIndex + 1) % updatedGame.game_players.length
+              (originalPlayerIndex + 1) % updatedGame.game_players.length
               ];
           }
 
@@ -3963,7 +3963,7 @@ export class GamePlayerService {
 
       const selectedQuestion =
         availableQuestions[
-          Math.floor(Math.random() * availableQuestions.length)
+        Math.floor(Math.random() * availableQuestions.length)
         ];
 
       await this.prisma.$transaction([
@@ -4245,8 +4245,8 @@ export class GamePlayerService {
             progress_percentage:
               game.total_questions > 0
                 ? Math.round(
-                    (game.current_question / game.total_questions) * 100,
-                  )
+                  (game.current_question / game.total_questions) * 100,
+                )
                 : 0,
           },
         },
@@ -4653,9 +4653,9 @@ export class GamePlayerService {
 
         throw new NotFoundException(
           `Player not found in this game. ` +
-            `Looking for player ID: ${playerId}. ` +
-            `Available players: ${availablePlayerIds.join(', ')} ` +
-            `(${availablePlayerNames.join(', ')})`,
+          `Looking for player ID: ${playerId}. ` +
+          `Available players: ${availablePlayerIds.join(', ')} ` +
+          `(${availablePlayerNames.join(', ')})`,
         );
       }
 
@@ -4837,8 +4837,8 @@ export class GamePlayerService {
             progress_percentage:
               game.total_questions > 0
                 ? Math.round(
-                    (game.current_question / game.total_questions) * 100,
-                  )
+                  (game.current_question / game.total_questions) * 100,
+                )
                 : 0,
           },
           host_id: hostUserId,
