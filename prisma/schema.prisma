@@ -542,17 +542,17 @@ enum RoomStatus {
 }
 
 model Room {
-  id           String       @id @default(cuid())
-  code         String       @unique
-  game_id      String
-  host_id      String
-  name         String?
-  scheduled_at DateTime?
-  status       RoomStatus   @default(WAITING)
-  created_at   DateTime     @default(now())
-  game_players GamePlayer[]
-  game         Game         @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  host         User         @relation(fields: [host_id], references: [id], onDelete: Cascade)
+  id            String       @id @default(cuid())
+  code          String       @unique
+  game_id       String
+  host_id       String
+  name          String?
+  question_time Int?
+  status        RoomStatus   @default(WAITING)
+  created_at    DateTime     @default(now())
+  game_players  GamePlayer[]
+  game          Game         @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  host          User         @relation(fields: [host_id], references: [id], onDelete: Cascade)
 
   @@map("rooms")
 }
