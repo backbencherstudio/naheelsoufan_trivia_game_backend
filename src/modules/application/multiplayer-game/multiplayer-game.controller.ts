@@ -21,7 +21,7 @@ import { UpdateRoomDto } from './dto/update-room.dto';
 export class MultiplayerGameController {
   constructor(
     private readonly multiplayerGameService: MultiplayerGameService,
-  ) {}
+  ) { }
 
   @Post('create')
   @ApiOperation({ summary: 'Create a new multiplayer game and room' })
@@ -54,6 +54,7 @@ export class MultiplayerGameController {
     const userId = req.user.userId;
     return this.multiplayerGameService.joinGame(identifier, userId);
   }
+
   @Post('grid-join/:identifier')
   @ApiOperation({ summary: 'Join a game using either Game ID or Room Code' })
   async gridJoinGame(@Param('identifier') identifier: string, @Req() req: any) {

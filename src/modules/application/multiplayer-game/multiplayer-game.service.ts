@@ -18,7 +18,7 @@ export class MultiplayerGameService {
   constructor(
     private prisma: PrismaService,
     private readonly gameGateway: MessageGateway,
-  ) {}
+  ) { }
 
   /**
    * API 1: Create a new multiplayer game, a room, and add the host as the first player.
@@ -206,7 +206,7 @@ export class MultiplayerGameService {
         where: { id: roomId, host_id: room.host_id },
         data: {
           name: updateDto.name,
-          scheduled_at: updateDto.scheduled_at,
+          question_time: updateDto.question_time,
         },
       });
 
