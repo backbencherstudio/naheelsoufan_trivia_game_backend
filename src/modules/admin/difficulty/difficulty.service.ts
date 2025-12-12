@@ -85,8 +85,19 @@ export class DifficultyService {
               name: true,
             },
           },
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
         },
       });
+
+      // Add question count to each difficulty
+      for (const difficulty of difficulties) {
+        difficulty['questions_count'] = difficulty['_count']?.questions || 0;
+        delete difficulty['_count'];
+      }
 
       // Pagination metadata calculation
       const totalPages = Math.ceil(total / limit);
