@@ -135,14 +135,21 @@ export class CategoryService {
               name: true,
             },
           },
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
         },
       });
 
-      // Add image URLs if the image is available
+      // Add image URLs and question count
       for (const category of categories) {
         if (category.image) {
           category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
         }
+        category['questions_count'] = category['_count']?.questions || 0;
+        delete category['_count'];
       }
 
       const totalPages = Math.ceil(total / limit);
