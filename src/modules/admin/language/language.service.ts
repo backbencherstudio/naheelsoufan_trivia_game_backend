@@ -85,14 +85,25 @@ export class LanguageService {
           file_url: true,
           created_at: true,
           updated_at: true,
+          _count: {
+            select: {
+              categories: true,
+              questions: true,
+              difficulties: true,
+            },
+          },
         },
       });
 
-      // Add file URLs if the file_url is available
+      // Add file URLs and counts
       for (const language of languages) {
         if (language.file_url) {
           language['file_url'] = SojebStorage.url(appConfig().storageUrl.language + language.file_url);
         }
+        language['categories_count'] = language['_count']?.categories || 0;
+        language['questions_count'] = language['_count']?.questions || 0;
+        language['difficulties_count'] = language['_count']?.difficulties || 0;
+        delete language['_count'];
       }
 
       // Pagination metadata calculation

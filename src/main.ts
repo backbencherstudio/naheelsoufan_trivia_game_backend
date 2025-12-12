@@ -41,6 +41,7 @@ async function bootstrap() {
     'http://localhost:3001',
     'http://localhost:6000',
     'https://naheelsoufan-dynamic-trivia-game-fr.vercel.app',
+    'https://inzilly.com',
     '*',
   ];
 
