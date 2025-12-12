@@ -30,7 +30,7 @@ export class MultiplayerGameService {
         where: {
           host_id: hostId,
           mode: {
-            in: ['QUICK_GAME', 'GRID_STYLE'],
+            in: ['ONLINE_QUICK_GAME'],
           },
         },
       });
@@ -39,10 +39,10 @@ export class MultiplayerGameService {
       let activeSubscription = null;
 
       // If user has already created any game (free one used), check for subscription
-      if (totalGamesCount > 0) {
+      if (totalGamesCount >= 0) {
         requiresSubscription = true;
 
-        activeSubscription = await this.prisma.subscription.findFirst({
+        const activeSubscriptions = await this.prisma.subscription.findMany({
           where: {
             user_id: hostId,
             status: 'active',
@@ -52,6 +52,22 @@ export class MultiplayerGameService {
           },
         });
 
+        if (activeSubscriptions.length > 0) {
+          // Default to the first one
+          activeSubscription = activeSubscriptions[0];
+
+          // If looking for ONLINE_QUICK_GAME, try to find a specific match
+          if (createDto.mode === 'ONLINE_QUICK_GAME') {
+            const specificSub = activeSubscriptions.find(
+              (s) => s.subscription_type.type === 'ONLINE_QUICK_GAME',
+            );
+            if (specificSub) {
+              activeSubscription = specificSub;
+            }
+          }
+        }
+
+
         if (!activeSubscription) {
           return {
             success: false,
@@ -59,6 +75,25 @@ export class MultiplayerGameService {
             data: {
               requires_subscription: true,
               total_games_created: totalGamesCount,
+            },
+          };
+        }
+
+        // Check if the subscription type matches the game mode for ONLINE_QUICK_GAME
+        if (
+          createDto.mode === 'ONLINE_QUICK_GAME' &&
+          activeSubscription.subscription_type.type !== 'ONLINE_QUICK_GAME'
+        ) {
+          return {
+            success: false,
+            message: `You need an 'Online Quick Game' subscription to create this game. Your current subscription is for ${activeSubscription.subscription_type.type.replace(
+              '_',
+              ' ',
+            )}.`,
+            data: {
+              requires_specific_subscription: true,
+              required_type: 'ONLINE_QUICK_GAME',
+              current_type: activeSubscription.subscription_type.type,
             },
           };
         }
@@ -296,18 +331,18 @@ export class MultiplayerGameService {
 
     let maxPlayers: number;
 
-    if (isMaxLimit) {
-      maxPlayers = isMaxLimit;
-    } else if (
+    if (
       room.game?.subscription &&
-      room.game.subscription.subscription_type.players > 0
+      room.game.subscription.subscription_type.players
     ) {
       maxPlayers = room.game.subscription.subscription_type.players;
+    } else if (isMaxLimit) {
+      maxPlayers = isMaxLimit;
     } else {
       maxPlayers = 4;
     }
 
-    if (room._count.game_players >= isMaxLimit) {
+    if (room._count.game_players >= maxPlayers) {
       throw new BadRequestException('This room is already full.');
     }
 

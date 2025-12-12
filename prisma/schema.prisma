@@ -432,6 +432,7 @@ model Subscription {
 enum GameMode {
   QUICK_GAME
   GRID_STYLE
+  ONLINE_QUICK_GAME
 }
 
 model Game {
