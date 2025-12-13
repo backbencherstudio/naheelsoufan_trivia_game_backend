@@ -66,7 +66,7 @@ import { Roles } from 'src/common/guard/role/roles.decorator';
 @Roles(Role.USER, Role.ADMIN, Role.HOST)
 @ApiBearerAuth()
 export class GamePlayerController {
-  constructor(private readonly gamePlayerService: GamePlayerService) {}
+  constructor(private readonly gamePlayerService: GamePlayerService) { }
 
   @UseGuards(JwtAuthGuard)
   @ApiOperation({

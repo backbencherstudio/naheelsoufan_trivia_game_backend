@@ -12,6 +12,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { randomBytes } from 'crypto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { MessageGateway } from 'src/modules/chat/message/message.gateway';
+import appConfig from 'src/config/app.config';
+import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 
 @Injectable()
 export class MultiplayerGameService {
@@ -376,7 +378,28 @@ export class MultiplayerGameService {
         },
       });
 
-      this.gameGateway.emitPlayerJoined(room.id, newPlayer);
+      const playerIds = room.game_players.map((player) => player.user.id);
+      playerIds.push(newPlayer.user.id);
+
+
+
+      const avatarUrl = newPlayer.user.avatar
+        ? SojebStorage.url(
+          appConfig().storageUrl.avatar + newPlayer.user.avatar,
+        )
+        : null;
+
+      const playerJoinedData = {
+        player_id: newPlayer.id,
+        player_order: newPlayer.player_order,
+        user_id: newPlayer.user_id,
+        name: newPlayer.user.name,
+        avatar: newPlayer.user.avatar,
+        avatar_url: avatarUrl,
+      };
+
+      this.gameGateway.server.to(playerIds).emit('playerJoined', playerJoinedData);
+
 
       return {
         success: true,

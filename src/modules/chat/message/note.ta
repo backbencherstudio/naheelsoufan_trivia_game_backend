@@ -1,0 +1,77 @@
+ @SubscribeMessage('recordingChunk')
+  handleRecordingChunk(
+    client: Socket,
+    @MessageBody()
+    payload: {
+      recordingId: string;
+      sequence: number;
+      chunk: Buffer | any;
+    },
+  ) {
+    console.log('Received chunk', payload.sequence, payload.chunk.length);
+    const { recordingId, chunk } = payload;
+    const filePath = path.join(this.uploadsDir, `${recordingId}.webm`);
+
+    if (!this.chunks.has(recordingId)) {
+      this.chunks.set(recordingId, Buffer.alloc(0));
+    }
+
+    this.chunks.set(
+      recordingId,
+      Buffer.concat([
+        this.chunks.get(recordingId),
+        Buffer.from(new Uint8Array(chunk)),
+      ]),
+    );
+  }
+
+  @SubscribeMessage('recordingEnded')
+  handleRecordingEnd(
+    client: Socket,
+    @MessageBody() payload: { recordingId: string },
+  ) {
+    const filePath = path.join(this.uploadsDir, `${payload.recordingId}.webm`);
+    const stream = fs.createWriteStream(filePath, { flags: 'a' });
+
+    console.log(`Started writing to file ${filePath}`);
+    const buffer = this.chunks.get(payload.recordingId);
+    if (buffer) {
+      stream.write(buffer);
+      this.chunks.delete(payload.recordingId);
+    }
+  }
+
+  emitPlayerJoined(roomId: string, playerInfo: any) {
+    this.server.to(roomId).emit('playerJoined', playerInfo);
+    console.log(`Emitted playerJoined event to room ${roomId}`, playerInfo);
+  }
+
+  emitPlayerLeft(roomId: string, playerInfo: any) {
+    this.server.to(roomId).emit('playerLeft', playerInfo);
+    console.log(`Emitted playerLeft event to room ${roomId}`, playerInfo);
+  }
+
+  /**
+   * Emits an event to all clients in a room when room details are updated.
+   * @param roomId The ID of the room to emit to.
+   * @param roomInfo The updated room data.
+   */
+  emitRoomUpdated(roomId: string, roomInfo: any) {
+    this.server.to(roomId).emit('roomUpdated', roomInfo);
+    console.log(`Emitted roomUpdated event to room ${roomId}`, roomInfo);
+  }
+  // ...
+  emitNewQuestionForMultiplayer(roomId: string, data: any) {
+    this.server.to(roomId).emit('newQuestionReady', data);
+    console.log(`Emitted newQuestionReady event to room ${roomId}`, data);
+  }
+
+  emitAnswerResult(roomId: string, data: any) {
+    this.server.to(roomId).emit('answerResult', data);
+    console.log(`Emitted answerResult event to room ${roomId}`, data);
+  }
+
+  emitGameOver(roomId: string, data: any) {
+    this.server.to(roomId).emit('gameOver', data);
+    console.log(`Emitted gameOver event to room ${roomId}`, data);
+  }
