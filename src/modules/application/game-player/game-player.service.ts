@@ -338,7 +338,7 @@ export class GamePlayerService {
       const gamePlayer = await this.prisma.gamePlayer.findFirst({
         where: {
           game_id: leaveGameDto.game_id,
-          user_id: userId,
+          user_id: userId || leaveGameDto.user_id,
         },
       });
 
@@ -347,6 +347,24 @@ export class GamePlayerService {
       }
       // eta single mobile play er jonno
       if (gamePlayer) {
+
+        const game = await this.prisma.game.findUnique({
+          where: { id: leaveGameDto.game_id },
+          include: {
+            rooms: true,
+            game_players: true,
+          },
+        });
+
+        if (game && game.rooms.length > 0) {
+          const playerUserIds = game.game_players.map((p) => p.user_id);
+          this.gatway.server.to(playerUserIds).emit('playerLeft', {
+            id: gamePlayer.id,
+            user_id: gamePlayer.user_id,
+            message: 'A player has left the game.',
+          });
+        }
+
         await this.prisma.gamePlayer.deleteMany({
           where: { user_id: gamePlayer.user_id },
         });
@@ -3343,9 +3361,9 @@ export class GamePlayerService {
           },
         };
 
-        if (isMultiPhoneGame) {
-          this.gatway.emitAnswerResult(roomId, gameOverResponse.data);
-        }
+        // if (isMultiPhoneGame) {
+        //   this.gatway.server.to(roomId).emit('answerResult', gameOverResponse.data);
+        // }
         return gameOverResponse;
       }
 
@@ -3408,6 +3426,7 @@ export class GamePlayerService {
             : `Correct answer! Next turn is for ${nextTurnPlayer.player_name}.`,
           data: {
             is_correct: true,
+            is_hunt: false,
             is_steal: isStealMode,
             points_earned: pointsEarned,
             player_score: updatedPlayer.score,
@@ -3423,8 +3442,10 @@ export class GamePlayerService {
           },
         };
 
+        // complete notification to all players
         if (isMultiPhoneGame) {
-          this.gatway.emitAnswerResult(roomId, successResponse.data);
+          const playerUserIds = updatedGame.game_players.map((p) => p.user_id);
+          this.gatway.server.to(playerUserIds).emit('answerResult', successResponse.data);
         }
         return successResponse;
       } else {
@@ -3469,6 +3490,7 @@ export class GamePlayerService {
             message: 'Incorrect steal attempt. Moving to the next round.',
             data: {
               is_correct: false,
+              is_hunt: false,
               is_steal: true,
               player_score: updatedPlayer.score,
               correct_answer: {
@@ -3483,8 +3505,10 @@ export class GamePlayerService {
             },
           };
 
+          // complete notification to all players
           if (isMultiPhoneGame) {
-            this.gatway.emitAnswerResult(roomId, stealFailResponse.data);
+            const playerUserIds = updatedGame.game_players.map((p) => p.user_id);
+            this.gatway.server.to(playerUserIds).emit('answerResult', stealFailResponse.data);
           }
           return stealFailResponse;
         } else {
@@ -3499,6 +3523,7 @@ export class GamePlayerService {
             message: `Wrong answer! The question is now open for anyone to steal.`,
             data: {
               is_correct: false,
+              is_hunt: true,
               player_score: updatedPlayer.score,
               correct_answer: {
                 id: correctAnswer?.id,
@@ -3518,7 +3543,8 @@ export class GamePlayerService {
           };
 
           if (isMultiPhoneGame) {
-            this.gatway.emitAnswerResult(roomId, openForStealResponse.data);
+            const playerUserIds = updatedGame.game_players.map((p) => p.user_id);
+            this.gatway.server.to(playerUserIds).emit('answerResult', openForStealResponse.data);
           }
           return openForStealResponse;
         }
@@ -4004,7 +4030,13 @@ export class GamePlayerService {
         id: selectedQuestion.id,
         text: selectedQuestion.text,
         points: selectedQuestion.points,
-        time_limit: selectedQuestion.time,
+
+        time_limit:
+          game.rooms &&
+            game.rooms.length > 0 &&
+            game.rooms[0].question_time
+            ? game.rooms[0].question_time
+            : selectedQuestion.time,
         file_url: fileUrl,
         question_type: selectedQuestion.question_type,
         answers: selectedQuestion.answers.map((a) => ({
@@ -4036,9 +4068,11 @@ export class GamePlayerService {
       const isMultiPhoneGame = game.rooms && game.rooms.length > 0;
 
       if (isMultiPhoneGame) {
-        const roomId = game.rooms[0].id;
-        this.gatway.emitNewQuestionForMultiplayer(roomId, responseData);
+
+        this.gatway.server.to(currentPlayer.user_id).emit('newQuestionReady', responseData);
       }
+
+
 
       return {
         success: true,

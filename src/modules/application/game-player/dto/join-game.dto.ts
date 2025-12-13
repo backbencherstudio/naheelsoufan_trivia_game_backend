@@ -28,4 +28,9 @@ export class LeaveGameDto {
   @IsString()
   @IsNotEmpty()
   game_id: string;
+
+
+  @IsString()
+  @IsOptional()
+  user_id?: string;
 }
