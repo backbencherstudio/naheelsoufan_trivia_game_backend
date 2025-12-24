@@ -3881,9 +3881,9 @@ export class GamePlayerService {
         baseWhereCondition.question_type_id = textQuestionType.id;
       }
 
-      if (isFreeGame) {
-        baseWhereCondition.free_bundle = true;
-      }
+      // if (isFreeGame) {
+      //   baseWhereCondition.free_bundle = true;
+      // }
 
       const potentialQuestions = await this.prisma.question.findMany({
         where: baseWhereCondition,
@@ -3942,9 +3942,9 @@ export class GamePlayerService {
         whereCondition.question_type_id = textQuestionType.id;
       }
 
-      if (isFreeGame) {
-        whereCondition.free_bundle = true;
-      }
+      // if (isFreeGame) {
+      //   whereCondition.free_bundle = true;
+      // }
 
       const allQuestions = await this.prisma.question.findMany({
         where: whereCondition,

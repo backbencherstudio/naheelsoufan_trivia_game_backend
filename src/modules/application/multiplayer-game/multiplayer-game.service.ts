@@ -224,19 +224,27 @@ export class MultiplayerGameService {
         where: { id: roomId },
       });
       if (!room) {
-        throw new NotFoundException('Room not found.');
+        return {
+          success: false,
+          message: 'Room not found.',
+          statusCode: 404,
+        };
       }
 
       if (room.host_id !== userId) {
-        throw new ForbiddenException(
-          'Only the host can update the room details.',
-        );
+        return {
+          success: false,
+          message: 'Only the host can update the room details.',
+          statusCode: 403,
+        };
       }
 
       if (room.status !== 'WAITING') {
-        throw new BadRequestException(
-          'Cannot update details for a game that is in progress or completed.',
-        );
+        return {
+          success: false,
+          message: 'Cannot update details for a game that is in progress or completed.',
+          statusCode: 400,
+        };
       }
 
       const updatedRoom = await this.prisma.room.update({
@@ -253,7 +261,11 @@ export class MultiplayerGameService {
         data: updatedRoom,
       };
     } catch (error) {
-      console.log(error);
+      return {
+        success: false,
+        message: 'An unexpected error occurred while updating the room details.',
+        statusCode: 500,
+      };
     }
   }
 
