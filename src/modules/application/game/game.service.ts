@@ -755,24 +755,6 @@ export class GameService {
         }
       }
 
-      // --- 2.1 Free Game Filter ---
-      if (gameId) {
-        const game = await this.prisma.game.findUnique({
-          where: { id: gameId },
-          select: { subscription_id: true },
-        });
-
-        // If game exists and has no subscription, it's a free game
-        if (game && !game.subscription_id) {
-          if (!whereClause.questions) {
-            whereClause.questions = { some: {} };
-          }
-          // Add free_bundle constraint
-          whereClause.questions.some.free_bundle = true;
-          questionCountWhere.free_bundle = true;
-        }
-      }
-
       // Ensure only categories with at least one question are returned
       if (!whereClause.questions) {
         whereClause.questions = {
