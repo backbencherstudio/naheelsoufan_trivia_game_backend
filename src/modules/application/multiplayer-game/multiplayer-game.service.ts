@@ -20,7 +20,7 @@ export class MultiplayerGameService {
   constructor(
     private prisma: PrismaService,
     private readonly gameGateway: MessageGateway,
-  ) { }
+  ) {}
 
   /**
    * API 1: Create a new multiplayer game, a room, and add the host as the first player.
@@ -68,7 +68,6 @@ export class MultiplayerGameService {
             }
           }
         }
-
 
         if (!activeSubscription) {
           return {
@@ -242,7 +241,8 @@ export class MultiplayerGameService {
       if (room.status !== 'WAITING') {
         return {
           success: false,
-          message: 'Cannot update details for a game that is in progress or completed.',
+          message:
+            'Cannot update details for a game that is in progress or completed.',
           statusCode: 400,
         };
       }
@@ -263,7 +263,8 @@ export class MultiplayerGameService {
     } catch (error) {
       return {
         success: false,
-        message: 'An unexpected error occurred while updating the room details.',
+        message:
+          'An unexpected error occurred while updating the room details.',
         statusCode: 500,
       };
     }
@@ -333,12 +334,50 @@ export class MultiplayerGameService {
           'You cannot rejoin because you have already participated in the game.',
         );
       }
+
+      const allPlayersData = room.game_players.map((player) => {
+        const pAvatarUrl = player.user.avatar
+          ? SojebStorage.url(appConfig().storageUrl.avatar + player.user.avatar)
+          : null;
+        return {
+          player_id: player.id,
+          player_order: player.player_order,
+          user_id: player.user_id,
+          name: player.user.name,
+          avatar: player.user.avatar,
+          avatar_url: pAvatarUrl,
+        };
+      });
+
+      const newPlayer = room.game_players.find(
+        (p) => p.id === existingPlayer.id,
+      );
+
+      const playerIds = room.game_players.map((player) => player.user.id);
+
+      const avatarUrl = newPlayer.user.avatar
+        ? SojebStorage.url(
+            appConfig().storageUrl.avatar + newPlayer.user.avatar,
+          )
+        : null;
+
+      const playerJoinedData = {
+        player_id: newPlayer.id,
+        player_order: newPlayer.player_order,
+        user_id: newPlayer.user_id,
+        name: newPlayer.user.name,
+        avatar: newPlayer.user.avatar,
+        avatar_url: avatarUrl,
+      };
+      this.gameGateway.server
+        .to(playerIds)
+        .emit('playerJoined', playerJoinedData);
+
       return {
         success: true,
         message: 'Rejoined the game successfully.',
         data: {
-          player: existingPlayer,
-          allPlayers: room.game_players,
+          allPlayers: allPlayersData,
         },
       };
     }
@@ -393,12 +432,26 @@ export class MultiplayerGameService {
       const playerIds = room.game_players.map((player) => player.user.id);
       playerIds.push(newPlayer.user.id);
 
+      const allPlayers = [...room.game_players, newPlayer];
 
+      const allPlayersData = allPlayers.map((player) => {
+        const pAvatarUrl = player.user.avatar
+          ? SojebStorage.url(appConfig().storageUrl.avatar + player.user.avatar)
+          : null;
+        return {
+          player_id: player.id,
+          player_order: player.player_order,
+          user_id: player.user_id,
+          name: player.user.name,
+          avatar: player.user.avatar,
+          avatar_url: pAvatarUrl,
+        };
+      });
 
       const avatarUrl = newPlayer.user.avatar
         ? SojebStorage.url(
-          appConfig().storageUrl.avatar + newPlayer.user.avatar,
-        )
+            appConfig().storageUrl.avatar + newPlayer.user.avatar,
+          )
         : null;
 
       const playerJoinedData = {
@@ -410,13 +463,16 @@ export class MultiplayerGameService {
         avatar_url: avatarUrl,
       };
 
-      this.gameGateway.server.to(playerIds).emit('playerJoined', playerJoinedData);
-
+      this.gameGateway.server
+        .to(playerIds)
+        .emit('playerJoined', playerJoinedData);
 
       return {
         success: true,
         message: 'Successfully joined the game.',
-        data: newPlayer,
+        data: {
+          allPlayers: allPlayersData,
+        },
       };
     } catch (error) {
       throw new InternalServerErrorException(
@@ -533,6 +589,102 @@ export class MultiplayerGameService {
         success: false,
         message:
           'An unexpected error occurred while searching for online games.',
+        statusCode: 500,
+      };
+    }
+  }
+
+  async startGame(gameId: string, userId: string) {
+    try {
+      const game = await this.prisma.game.findUnique({
+        where: { id: gameId },
+      });
+      if (!game) {
+        return {
+          success: false,
+          message: 'Game not found.',
+          statusCode: 404,
+        };
+      }
+
+      if (game.host_id !== userId) {
+        return {
+          success: false,
+          message: 'Only the host can start the game.',
+          statusCode: 403,
+        };
+      }
+
+      if (game.status !== 'WAITING') {
+        return {
+          success: false,
+          message: 'Game is not in the waiting state.',
+          statusCode: 400,
+        };
+      }
+
+      // const updatedGame = await this.prisma.game.update({
+      //   where: { id: gameId },
+      //   data: { status: 'IN_PROGRESS' },
+      // });
+
+      // await this.prisma.room.updateMany({
+      //   where: { game_id: gameId },
+      //   data: { status: 'IN_PROGRESS' },
+      // });
+
+      const room = await this.prisma.room.findFirst({
+        where: { game_id: gameId },
+      });
+
+      const allPlayers = await this.prisma.gamePlayer.findMany({
+        where: { room_id: room.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
+          },
+        },
+        orderBy: {
+          player_order: 'asc',
+        },
+      });
+
+      const firstPlayer = allPlayers.length > 0 ? allPlayers[0] : null;
+
+      if (firstPlayer) {
+        // Emit to the first player
+        this.gameGateway.server.to(firstPlayer.user.id).emit('gameStarted', {
+          message: 'Game started successfully.',
+          start: true,
+        });
+
+        // Emit to the rest of the players
+        const otherPlayers = allPlayers.slice(1);
+        if (otherPlayers.length > 0) {
+          const otherPlayerIds = otherPlayers.map((p) => p.user.id);
+          this.gameGateway.server.to(otherPlayerIds).emit('gameStarted', {
+            message: 'Game started successfully. please wait.',
+            start: false,
+          });
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Game started successfully.',
+        data: {
+          allPlayers,
+          firstPlayer,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'An unexpected error occurred while starting the game.',
         statusCode: 500,
       };
     }

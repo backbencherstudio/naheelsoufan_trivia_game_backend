@@ -21,7 +21,7 @@ import { UpdateRoomDto } from './dto/update-room.dto';
 export class MultiplayerGameController {
   constructor(
     private readonly multiplayerGameService: MultiplayerGameService,
-  ) { }
+  ) {}
 
   @Post('create')
   @ApiOperation({ summary: 'Create a new multiplayer game and room' })
@@ -31,6 +31,13 @@ export class MultiplayerGameController {
   ) {
     const hostId = req.user.userId;
     return this.multiplayerGameService.createGame(createDto, hostId);
+  }
+
+  @Get('start-game/:gameId')
+  @ApiOperation({ summary: 'Start a game' })
+  async startGame(@Param('gameId') gameId: string, @Req() req: any) {
+    const userId = req.user.userId;
+    return this.multiplayerGameService.startGame(gameId, userId);
   }
 
   @Patch('room/:roomId')
