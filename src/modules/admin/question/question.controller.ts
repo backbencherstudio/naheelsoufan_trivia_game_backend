@@ -61,7 +61,7 @@ export class QuestionController {
         };
       }
 
-      const result = await this.questionService.oldImportQuestions(file);
+      const result = await this.questionService.newImportQuestions(file);
       return result;
     } catch (error) {
       return {
