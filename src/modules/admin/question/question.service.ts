@@ -500,7 +500,6 @@ export class QuestionService {
           const existingCategory = await this.prisma.category.findFirst({
             where: {
               name: questionData.category,
-              language_id: languageId
             }
           });
 
@@ -522,7 +521,6 @@ export class QuestionService {
           const existingDifficulty = await this.prisma.difficulty.findFirst({
             where: {
               name: questionData.difficulty,
-              language_id: languageId
             }
           });
 
@@ -749,7 +747,6 @@ export class QuestionService {
             const existingCategory = await this.prisma.category.findFirst({
               where: {
                 name: questionData.category,
-                language_id: languageId
               }
             });
 
@@ -771,7 +768,6 @@ export class QuestionService {
             const existingDifficulty = await this.prisma.difficulty.findFirst({
               where: {
                 name: questionData.difficulty,
-                language_id: languageId
               }
             });
 
@@ -795,7 +791,6 @@ export class QuestionService {
             const existingQuestionType = await this.prisma.questionType.findFirst({
               where: {
                 name: questionData.question_type,
-                language_id: languageId
               }
             });
 
