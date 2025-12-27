@@ -173,6 +173,14 @@ export class QuestionService {
             }
           }
         }
+
+          // Count how many times this question was used in games
+          const selectionCount = await this.prisma.gameQuestion.count({
+            where: {
+              question_id: question.id,
+            },
+          });
+          question['selection_count'] = selectionCount;
       }
 
       // Pagination metadata calculation

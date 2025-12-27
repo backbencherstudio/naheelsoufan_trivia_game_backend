@@ -143,12 +143,23 @@ export class CategoryService {
         },
       });
 
-      // Add image URLs and question count
+      // Add image URLs, question count, and game selection count
       for (const category of categories) {
         if (category.image) {
           category['image_url'] = SojebStorage.url(appConfig().storageUrl.category + category.image);
         }
         category['questions_count'] = category['_count']?.questions || 0;
+        
+        // Count how many times this category's questions were used in games
+        const selectionCount = await this.prisma.gameQuestion.count({
+          where: {
+            question: {
+              category_id: category.id,
+            },
+          },
+        });
+        category['selection_count'] = selectionCount;
+        
         delete category['_count'];
       }
 
